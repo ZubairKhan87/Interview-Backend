@@ -1,0 +1,22 @@
+# Ignore Python cache files
+__pycache__/
+*.pyc
+
+# Ignore environment files
+.env
+
+# Ignore virtual environments
+venv/
+.env/
+
+# Ignore IDE/editor configs
+.vscode/
+.idea/
+
+# Ignore Django migrations (if needed)
+*/migrations/*.pyc
+*/migrations/*.pyo
+*/migrations/__pycache__/
+
+# Ignore logs
+*.log
