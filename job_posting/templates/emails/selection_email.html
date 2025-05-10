@@ -1,0 +1,54 @@
+<!-- templates/emails/selection_email.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            margin-bottom: 20px;
+        }
+        .content {
+            margin-bottom: 30px;
+        }
+        .signature {
+            margin-top: 30px;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        Dear {{ applicant.full_name }},
+    </div>
+    <div class="content">
+        <p>Congratulations! We are pleased to inform you that you have been shortlisted for the position of {{ applicant.job.title }}.</p>
+        
+        <p>We were impressed with your qualifications and interview performance, and we believe you would be a valuable addition to our team.</p>
+        
+        <p>Our HR team will contact you shortly with more details about the next steps.</p>
+    
+    </div>
+    <div class="signature">
+        
+        Best regards,<br/>
+        {{ applicant.job.job_title }}<br/>
+        {{ applicant.job.location }}<br/>
+        {{ recruiter.recruiter_name }}<br/>
+        {{ recruiter.recruiter_organization }}<br/>
+        {{ applicant.job.location }}<br/>
+        <small><em>This email is sent on behalf of {{ recruiter.recruiter_name }} ({{ recruiter.recruiter.email }})</em></small> <br>
+        For More Information Please Visit {{ recruiter.company_information }} <br>
+        <small><em>If you have any questions, please feel free to reach out to us.</em></small> <br>
+        Recruitment Team <br>
+        AI Powered Interviewing System
+    </div>
+</body>
+</html>

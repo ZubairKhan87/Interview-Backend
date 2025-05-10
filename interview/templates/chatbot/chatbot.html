@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Voice-Based Interview Assistant</title>
+</head>
+<body>
+    <h1>Interview Assistant</h1>
+    <button onclick="startListening()">🎤 Talk</button>
+    <p id="response"></p>
+
+    <script>
+        
+        // Function to start speech recognition
+        const startListening = () => {
+            const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = "en-GB";
+            recognition.start();
+
+            recognition.onresult = function (event) {
+                const userInput = event.results[0][0].transcript;
+                console.log("User said:", userInput);
+
+                // Send user input to the Django backend
+                fetch('/chat/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: userInput })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    const assistantResponse = data.response;
+                    console.log("Assistant:", assistantResponse);
+
+                    // Speak the response using TTS
+                    const utterance = new SpeechSynthesisUtterance(assistantResponse);
+                    window.speechSynthesis.speak(utterance);
+
+                    // Display response on the webpage
+                    document.getElementById('response').innerText = assistantResponse;
+                })
+                .catch(error => console.error('Error:', error));
+            };
+
+            recognition.onerror = function (event) {
+                console.error('Speech recognition error:', event.error);
+            };
+        };
+    </script>
+</body>
+</html>

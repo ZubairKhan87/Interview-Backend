@@ -1,0 +1,54 @@
+<!-- templates/emails/rejection_email.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            margin-bottom: 20px;
+        }
+        .content {
+            margin-bottom: 30px;
+        }
+        .signature {
+            margin-top: 30px;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        Dear {{ applicant.full_name }},
+    </div>
+    <div class="content">
+        <p>Thank you for your interest in the position of {{ applicant.job.title }}.</p>
+        
+        <p>After careful consideration, we regret to inform you that we have decided to move forward with other candidates.</p>
+        
+        <p>We encourage you to apply for future positions that match your skills and experience.</p>
+        
+        <p>We wish you the best in your future endeavors.</p>
+    </div>
+    <div class="signature">
+        Best regards,<br/>
+        {{ applicant.job.job_title }}<br/>
+        {{ applicant.job.location }}<br/>
+        {{ recruiter.recruiter_name }}<br/>
+        {{ recruiter.recruiter_organization }}<br/>
+        {{ applicant.job.location }}<br/>
+        <small><em>This email is sent on behalf of {{ recruiter.recruiter_name }} ({{ recruiter.recruiter.email }})</em></small> <br>
+        For More Information Please Visit {{ recruiter.company_information }} <br>
+        <small><em>If you have any questions, please feel free to reach out to us.</em></small> <br>
+        Recruitment Team <br>
+        AI Powered Interviewing System
+    </div>
+</body>
+</html>
