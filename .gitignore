@@ -1,9 +1,9 @@
-# Python bytecode files
+# Ignore Python bytecode files
 __pycache__/
 *.py[cod]
 *$py.class
 
-# Django migrations (ignore everything in the migrations folder except __init__.py)
+# Ignore migrations files in every app (but keep __init__.py)
 */migrations/*
 !*/migrations/__init__.py
 
@@ -12,13 +12,13 @@ venv/
 env/
 .venv/
 
-# Ignore .env files containing secrets
+# Ignore .env file containing secrets
 .env
 
 # Ignore media files (user-uploaded content)
 media/
 
-# Ignore SQLite database file (if you’re using SQLite)
+# Ignore SQLite database file (if you're using SQLite)
 db.sqlite3
 
 # Ignore log files
@@ -37,8 +37,3 @@ db.sqlite3
 build/
 dist/
 *.egg-info/
-
-# Ignore other common files
-*.pot
-*.pyc
-*.pyo
