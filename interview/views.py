@@ -286,7 +286,7 @@ def chatbot_response(request):
                             candidate_id=interview_state["current_candidate_id"]
                         )
             application.interview_status = 'started'
-            print("interview status is updated to n\Started")
+            print("interview status is updated to Started")
             application.save()
             return Response({
                 'response': initial_message, 
