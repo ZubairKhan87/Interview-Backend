@@ -196,6 +196,15 @@ DATABASES['default']['OPTIONS'] = {
     'sslmode': 'require',
 }
 
+POSTGRES_LOCALLY = False  # Set to True if you're running PostgreSQL locally
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")  # default to development
+import dj_database_url
+import os
+if ENVIRONMENT == 'production' or POSTGRES_LOCALLY==True:
+    DATABASES = {
+        'default': dj_database_url.parse(os.getenv("DATABASE_URL"))
+    }
+
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
