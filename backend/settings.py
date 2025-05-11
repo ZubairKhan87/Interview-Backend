@@ -335,7 +335,7 @@ CSRF_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SECURE = False    # Set to True in production
 
 from datetime import timedelta
-CSRF_TRUSTED_ORIGINS = ['http://localhost:5173']  
+CSRF_TRUSTED_ORIGINS = ['https://interview-backend-production-bdf0.up.railway.app', 'http://localhost:5173']  
 CORS_ALLOW_CREDENTIALS = True
 CORS_ORIGIN_WHITELIST = [
     'http://localhost:5173',  # Add your frontend URL
