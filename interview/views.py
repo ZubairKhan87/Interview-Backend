@@ -20,9 +20,14 @@ from rest_framework.authentication import SessionAuthentication, BasicAuthentica
 from job_posting.models import JobPostingTable, ApplicationTable
 from authentication.models import CandidateTable
 from groq import Groq
+from pathlib import Path
+
+from dotenv import load_dotenv
+env_path = Path(__file__).resolve().parent.parent / '.env'
+load_dotenv(dotenv_path=env_path)
 # print(huggingface_hub._version_)
 # Initialize the inference client
-client = Groq(api_key="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")
+client = Groq(api_key=os.getenv('GROQ_API_KEY'))
 # job = "Python programmer"
 # Skills="Object oriented programming, functions, and Data structures"
 # candidate_name="Faizaaaan"
@@ -30,7 +35,7 @@ client = Groq(api_key="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"
 from sapling import SaplingClient
 
 def AI_Detetection(text_to_analyze):
-    api_key = 'SA1F5G4VBMPOGDJKHI6D1ML2WUYJHJQW'
+    api_key =os.getenv('SAMPLE_API_KEY')
     client = SaplingClient(api_key=api_key)
     # text_to_analyze = ""
     detection_results = client.aidetect(text_to_analyze, sent_scores=True)

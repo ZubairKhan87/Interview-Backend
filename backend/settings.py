@@ -63,18 +63,18 @@ INSTALLED_APPS = [
 SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 CLOUDINARY_STORAGE = {
-    'CLOUD_NAME': 'dom6imbcs',
-    'API_KEY': '398845728168115',
-    'API_SECRET': '_f1eYEPiomv-lymolV-9yF_WxiM',
+    'CLOUD_NAME': os.getenv('CLOUDINARY_CLOUD_NAME'),
+    'API_KEY': os.getenv('CLOUDINARY_API_KEY'),
+    'API_SECRET': os.getenv('CLOUDINARY_API_SECRET')
 }
 
 import cloudinary
 
 # Direct Cloudinary configuration
 cloudinary.config(
-    cloud_name='dom6imbcs',
-    api_key='398845728168115',
-    api_secret='_f1eYEPiomv-lymolV-9yF_WxiM'
+    cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'),
+    api_key=os.getenv('CLOUDINARY_API_KEY'),
+    api_secret=os.getenv('CLOUDINARY_API_SECRET')
 )
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -185,8 +185,17 @@ DATABASES = {
         'PASSWORD': os.getenv("DB_PASSWORD"),  # PostgreSQL password
         'HOST': os.getenv("DB_HOST"),  # Assuming you're running PostgreSQL locally
         'PORT': os.getenv("DB_PORT"),  # Default PostgreSQL port
+        'CONN_MAX_AGE': 60,  # Keep DB connections open for 60 seconds
+        'sslmode': 'require',
+
+
+
     }
 }
+DATABASES['default']['OPTIONS'] = {
+    'sslmode': 'require',
+}
+
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
@@ -255,8 +264,8 @@ os.makedirs(os.path.join(MEDIA_ROOT, 'temp'), exist_ok=True)
 
 
 # Google OAuth2 settings
-GOOGLE_OAUTH2_CLIENT_ID = "305846523403-gjh733avsmqke5o2e5365fs4offlasv5.apps.googleusercontent.com"
-GOOGLE_OAUTH2_CLIENT_SECRET = "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"
+GOOGLE_OAUTH2_CLIENT_ID = os.getenv("GOOGLE_AUTH_ID")
+GOOGLE_OAUTH2_CLIENT_SECRET = os.getenv("GOOGLE_AUTH_SECRET")
 
 
 # Add these settings
@@ -303,9 +312,9 @@ LINKEDIN_SCOPES = [
     'w_member_social'
 ]
 # settings.py
-LINKEDIN_CLIENT_ID = '77vhqq226n7kdr'
-LINKEDIN_CLIENT_SECRET = 'WPL_AP1.oTXoZkEwQqLKvDwq.RTV6zw=='
-LINKEDIN_REDIRECT_URI = 'http://localhost:5173/linkedin/callback'  # Changed from linkedin-callback to linkedin/callback
+# LINKEDIN_CLIENT_ID = '77vhqq226n7kdr'
+# LINKEDIN_CLIENT_SECRET = 'WPL_AP1.oTXoZkEwQqLKvDwq.RTV6zw=='
+# LINKEDIN_REDIRECT_URI = 'http://localhost:5173/linkedin/callback'  # Changed from linkedin-callback to linkedin/callback
 FRONTEND_URL = 'http://localhost:5173'  # Make sure this matches your frontend URL
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'  # Make sure sessions are properly configured
 SESSION_COOKIE_SECURE = False  # Set to True in production

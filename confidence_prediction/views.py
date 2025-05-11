@@ -423,6 +423,11 @@ import numpy as np
 # import tensorflow as tf
 # from mtcnn import MTCNN
 # import cv2
+from pathlib import Path
+from dotenv import load_dotenv
+env_path = Path(__file__).resolve().parent.parent / '.env'
+load_dotenv(dotenv_path=env_path)
+import os
 import requests
 from io import BytesIO
 import threading
@@ -437,7 +442,7 @@ import re
 class ConfidencePredictor:
     def __init__(self):
         # Initialize the Hugging Face client
-        self.api_token = "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"
+        self.api_token =os.getenv("HF_API_TOKEN")
         self.client = Client(
             "bairi56/confidence-measure-model",
             hf_token=self.api_token
