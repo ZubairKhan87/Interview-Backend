@@ -197,3 +197,99 @@ Not Found: /api/authentication/profile/image/
 Not Found: /api/authentication/profile/image/
 Not Found: /api/authentication/profile/image/
 Not Found: /api/authentication/profile/image/
+Watching for file changes with StatReloader
+Unauthorized: /api/job_posting/publicposts/
+Unauthorized: /api/job_posting/publicposts/
+Unauthorized: /api/job_posting/candidate/applied-jobs/
+Unauthorized: /api/chat/current-candidate/
+Unauthorized: /api/job_posting/candidate/interview/completed/
+Unauthorized: /api/job_posting/candidate/interview/incomplete/
+Unauthorized: /api/job_posting/candidate/applied-jobs/
+Not Found: /api/authentication/profile/image/
+Unauthorized: /api/job_posting/candidate/interview/completed/
+Unauthorized: /api/chat/current-candidate/
+Unauthorized: /api/job_posting/candidate/interview/incomplete/
+Unauthorized: /api/job_posting/candidate/applied-jobs/
+Not Found: /api/authentication/profile/image/
+Unauthorized: /api/job_posting/candidate/applied-jobs/
+Unauthorized: /api/job_posting/publicposts/
+Unauthorized: /api/job_posting/publicposts/
+Unauthorized: /api/authentication/profile/candidate/image/
+Unauthorized: /api/chat/current-candidate/
+Unauthorized: /api/job_posting/candidate/applied-jobs/
+Unauthorized: /api/job_posting/candidate/interview/completed/
+Unauthorized: /api/job_posting/candidate/interview/incomplete/
+Not Found: /api/authentication/profile/image/
+Unauthorized: /api/authentication/profile/candidate/image/
+Unauthorized: /api/chat/current-candidate/
+Unauthorized: /api/job_posting/candidate/applied-jobs/
+Unauthorized: /api/job_posting/candidate/interview/completed/
+Unauthorized: /api/job_posting/candidate/interview/incomplete/
+Not Found: /api/authentication/profile/image/
+Unauthorized: /api/job_posting/candidate/applied-jobs/
+Unauthorized: /api/job_posting/candidate/applied-jobs/
+Unauthorized: /api/authentication/token/refresh/
+Unauthorized: /api/authentication/token/refresh/
+Unauthorized: /api/authentication/token/refresh/
+Unauthorized: /api/authentication/token/refresh/
+Unauthorized: /api/authentication/token/refresh/
+Unauthorized: /api/authentication/token/refresh/
+Unauthorized: /api/authentication/recruiter/
+Not Found: /api/authentication/profile/image/
+Not Found: /api/authentication/profile/image/
+Not Found: /api/authentication/profile/image/
+Not Found: /api/authentication/profile/image/
+Not Found: /api/authentication/profile/image/
+Not Found: /api/authentication/profile/image/
+Unauthorized: /api/job_posting/publicposts/
+Unauthorized: /api/job_posting/publicposts/
+Unauthorized: /api/authentication/profile/candidate/image/
+Unauthorized: /api/job_posting/candidate/applied-jobs/
+Unauthorized: /api/chat/current-candidate/
+Unauthorized: /api/job_posting/candidate/interview/completed/
+Not Found: /api/authentication/profile/image/
+Unauthorized: /api/job_posting/candidate/interview/incomplete/
+Unauthorized: /api/authentication/profile/candidate/image/
+Unauthorized: /api/job_posting/candidate/applied-jobs/
+Unauthorized: /api/chat/current-candidate/
+Unauthorized: /api/job_posting/candidate/interview/completed/
+Not Found: /api/authentication/profile/image/
+Unauthorized: /api/job_posting/candidate/interview/incomplete/
+Unauthorized: /api/job_posting/candidate/applied-jobs/
+Unauthorized: /api/job_posting/candidate/applied-jobs/
+Unauthorized: /api/authentication/profile/candidate/image/
+Unauthorized: /api/job_posting/candidate/applied-jobs/
+Not Found: /api/authentication/profile/image/
+Unauthorized: /api/chat/current-candidate/
+Unauthorized: /api/job_posting/candidate/interview/completed/
+Unauthorized: /api/job_posting/publicposts/
+Unauthorized: /api/job_posting/candidate/interview/incomplete/
+Unauthorized: /api/authentication/profile/candidate/image/
+Unauthorized: /api/job_posting/candidate/applied-jobs/
+Unauthorized: /api/chat/current-candidate/
+Not Found: /api/authentication/profile/image/
+Unauthorized: /api/job_posting/candidate/interview/completed/
+Unauthorized: /api/job_posting/publicposts/
+Unauthorized: /api/job_posting/candidate/interview/incomplete/
+Unauthorized: /api/job_posting/candidate/applied-jobs/
+Unauthorized: /api/job_posting/candidate/applied-jobs/
+Unauthorized: /api/authentication/profile/candidate/image/
+Unauthorized: /api/job_posting/candidate/applied-jobs/
+Unauthorized: /api/job_posting/publicposts/
+Unauthorized: /api/job_posting/candidate/interview/completed/
+Unauthorized: /api/chat/current-candidate/
+Unauthorized: /api/job_posting/candidate/interview/incomplete/
+Not Found: /api/authentication/profile/image/
+Unauthorized: /api/authentication/profile/candidate/image/
+Unauthorized: /api/job_posting/candidate/applied-jobs/
+Unauthorized: /api/job_posting/publicposts/
+Unauthorized: /api/job_posting/candidate/interview/completed/
+Unauthorized: /api/chat/current-candidate/
+Unauthorized: /api/job_posting/candidate/interview/incomplete/
+Not Found: /api/authentication/profile/image/
+Unauthorized: /api/job_posting/candidate/applied-jobs/
+Unauthorized: /api/job_posting/candidate/applied-jobs/
+Unauthorized: /api/authentication/token/refresh/
+Unauthorized: /api/authentication/token/refresh/
+Unauthorized: /api/authentication/token/refresh/
+Unauthorized: /api/authentication/token/refresh/
