@@ -1,22 +1,67 @@
-# Ignore Python cache files
+# Python bytecode
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 
-# Ignore environment files
+# Environment variables
 .env
+.env.*
 
-# Ignore virtual environments
+# Secret config files
+*.secret
+*.pem
+*.key
+*.crt
+
+# Python virtual environment
 venv/
-.env/
+env/
+ENV/
 
-# Ignore IDE/editor configs
+# VSCode and IDE settings
 .vscode/
 .idea/
+*.sublime-project
+*.sublime-workspace
 
-# Ignore Django migrations (if needed)
-*/migrations/*.pyc
-*/migrations/*.pyo
-*/migrations/__pycache__/
+# OS files
+.DS_Store
+Thumbs.db
 
-# Ignore logs
+# Django specific
 *.log
+*.pot
+*.pyc
+*.sqlite3
+db.sqlite3
+media/
+staticfiles/
+
+# Migrations (optional: ignore auto-generated ones)
+**/migrations/*.py
+!**/migrations/__init__.py
+
+# Node.js (if frontend included)
+node_modules/
+package-lock.json
+npm-debug.log
+yarn.lock
+
+# Coverage reports
+htmlcov/
+.coverage
+.tox/
+.nox/
+.cache/
+
+# Test and linting artifacts
+pytest_cache/
+coverage.xml
+*.cover
+*.log
+
+# Backup files
+*~
+*.bak
+*.tmp
+*.swp
