@@ -1,75 +1,44 @@
-# Python bytecode
+# Python bytecode files
 __pycache__/
 *.py[cod]
 *$py.class
 
-# Environment variables
-.env
-.env.*
+# Django migrations (ignore everything in the migrations folder except __init__.py)
+*/migrations/*
+!*/migrations/__init__.py
 
-# Secret config files
-*.secret
-*.pem
-*.key
-*.crt
-
-# Python virtual environment
+# Ignore virtual environment
 venv/
 env/
-ENV/
+.venv/
 
-# VSCode and IDE settings
-.vscode/
-.idea/
-*.sublime-project
-*.sublime-workspace
+# Ignore .env files containing secrets
+.env
 
-# OS files
-.DS_Store
-Thumbs.db
+# Ignore media files (user-uploaded content)
+media/
 
-# Django specific
+# Ignore SQLite database file (if you’re using SQLite)
+db.sqlite3
+
+# Ignore log files
 *.log
+
+# Ignore coverage reports
+.coverage
+
+# Ignore PyCharm project files (if using PyCharm)
+.idea/
+
+# Ignore VS Code settings (if using VS Code)
+.vscode/
+
+# Ignore build directories (for certain deployment processes)
+build/
+dist/
+*.egg-info/
+
+# Ignore other common files
 *.pot
 *.pyc
-*.sqlite3
-db.sqlite3
-media/
-staticfiles/
-
-# Migrations (optional: ignore auto-generated ones)
-**/migrations/*.py
-!**/migrations/__init__.py
-
-# Node.js (if frontend included)
-node_modules/
-package-lock.json
-npm-debug.log
-yarn.lock
-
-# Coverage reports
-htmlcov/
-.coverage
-.tox/
-.nox/
-.cache/
-
-# Test and linting artifacts
-pytest_cache/
-coverage.xml
-*.cover
-*.log
-
-# Backup files
-*~
-*.bak
-*.tmp
-*.swp
-# Ignore Python bytecode
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Ignore Django migration files
-**/migrations/*
-!**/migrations/__init__.py
+*.pyo
