@@ -32,15 +32,16 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-secret-key')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
+PORT = os.environ.get('PORT', '8000','8080')
 
-ALLOWED_HOSTS = ['localhost',
+ALLOWED_HOSTS = [
+    'localhost',
     '127.0.0.1',
     '.railway.app',
     'healthcheck.railway.app',
-    "/health/",
-    'interview-backend-production-bdf0.up.railway.app']
+    'interview-backend-production-bdf0.up.railway.app'
+]
 # Make sure Django binds to the port provided by Railway
-PORT = os.environ.get('PORT', '8000')
 
 # Application definition
 

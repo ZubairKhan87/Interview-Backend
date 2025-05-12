@@ -33,7 +33,7 @@ urlpatterns = [
     # path('api/confidence_prediction/', include('confidence_prediction.urls')),  # Add this line
     path('auth/', include('social_django.urls', namespace='social')),  # Adds Google OAuth endpoints
     
-    path('health/', health_check, name='health_check'),
+    path('/', health_check, name='health_check'),
 
 
 ]
