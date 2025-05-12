@@ -32,26 +32,26 @@ client = Groq(api_key=os.getenv('GROQ_API_KEY'))
 # Skills="Object oriented programming, functions, and Data structures"
 # candidate_name="Faizaaaan"
 # experience="Fresher"
-from sapling import SaplingClient
+# from sapling import SaplingClient
 
-def AI_Detetection(text_to_analyze):
-    api_key =os.getenv('SAMPLE_API_KEY')
-    client = SaplingClient(api_key=api_key)
-    # text_to_analyze = ""
-    detection_results = client.aidetect(text_to_analyze, sent_scores=True)
+# def AI_Detetection(text_to_analyze):
+#     api_key =os.getenv('SAMPLE_API_KEY')
+#     client = SaplingClient(api_key=api_key)
+#     # text_to_analyze = ""
+#     detection_results = client.aidetect(text_to_analyze, sent_scores=True)
 
-    # Evaluate the AI score
-    score = detection_results.get('score', 0)
-    # print(score)
-    # if score > 0.5:
-    #     print("The text is likely AI-generated.")
-    # elif score < 0.3:
-    #     print("The text is likely human-written.")
-    # else:
-    #     print("Uncertain. Manual review recommended.")
+#     # Evaluate the AI score
+#     score = detection_results.get('score', 0)
+#     # print(score)
+#     # if score > 0.5:
+#     #     print("The text is likely AI-generated.")
+#     # elif score < 0.3:
+#     #     print("The text is likely human-written.")
+#     # else:
+#     #     print("Uncertain. Manual review recommended.")
 
-    print(f"AI Probability Score: {score}")
-    return score
+#     print(f"AI Probability Score: {score}")
+#     return score
 
 # Helper function to get interview details from database
 def get_interview_details(job_id, candidate_id):
