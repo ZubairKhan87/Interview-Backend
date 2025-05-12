@@ -32,7 +32,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-secret-key')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
-PORT = os.environ.get('PORT', '8000','8080')
+PORT = os.environ.get('PORT', '8000')
 
 ALLOWED_HOSTS = [
     'localhost',
