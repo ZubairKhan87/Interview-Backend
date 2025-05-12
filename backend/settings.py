@@ -39,7 +39,9 @@ ALLOWED_HOSTS = [
     '127.0.0.1',
     '.railway.app',
     'healthcheck.railway.app',
-    'interview-backend-production-bdf0.up.railway.app'
+    'interview-backend-production-bdf0.up.railway.app',
+    "https://talent-scout-flax.vercel.app",
+
 ]
 # Make sure Django binds to the port provided by Railway
 
@@ -101,11 +103,10 @@ AUTHENTICATION_BACKENDS = (
     'django.contrib.auth.backends.ModelBackend',
     'social_core.backends.google.GoogleOAuth2',  # Add Google backend
 )
-CORS_ALLOW_ALL_ORIGINS = True
 # CORS settings
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://localhost:8000",
+    "interview-backend-production-bdf0.up.railway.app",
+    "https://talent-scout-flax.vercel.app",
 ]
 
 
@@ -130,7 +131,6 @@ TEMPLATES = [
 # AUTH_USER_MODEL = 'authentication.CustomUser'
 
 # CORS settings
-CORS_ALLOW_ALL_ORIGINS = True  # For development only
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = [
     'DELETE',
@@ -277,7 +277,7 @@ USE_I18N = True
 USE_TZ = True
 
 # settings.py(Using it while applying doing face verification)
-BASE_URL = 'http://localhost:8000'  # For development
+BASE_URL = 'interview-backend-production-bdf0.up.railway.app'  # For development
 # BASE_URL = 'https://your-domain.com'  # For production
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
@@ -314,7 +314,7 @@ GOOGLE_OAUTH2_CLIENT_SECRET = os.getenv("GOOGLE_AUTH_SECRET")
 
 # Add these settings
 # GOOGLE_OAUTH_REDIRECT_URI = "http://localhost:3000"
-GOOGLE_OAUTH2_REDIRECT_URI = "http://localhost:8000/auth/google/callback"
+GOOGLE_OAUTH2_REDIRECT_URI = "http://interview-backend-production-bdf0.up.railway.app/auth/google/callback"
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'  # Or your SMTP server
@@ -359,7 +359,7 @@ LINKEDIN_SCOPES = [
 # LINKEDIN_CLIENT_ID = '77vhqq226n7kdr'
 # LINKEDIN_CLIENT_SECRET = 'WPL_AP1.oTXoZkEwQqLKvDwq.RTV6zw=='
 # LINKEDIN_REDIRECT_URI = 'http://localhost:5173/linkedin/callback'  # Changed from linkedin-callback to linkedin/callback
-FRONTEND_URL = 'http://localhost:5173'  # Make sure this matches your frontend URL
+FRONTEND_URL = "https://talent-scout-flax.vercel.app",  # Make sure this matches your frontend URL
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'  # Make sure sessions are properly configured
 SESSION_COOKIE_SECURE = False  # Set to True in production
 SESSION_COOKIE_HTTPONLY = True
@@ -370,11 +370,12 @@ CSRF_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SECURE = False    # Set to True in production
 
 from datetime import timedelta
-CSRF_TRUSTED_ORIGINS = ['https://interview-backend-production-bdf0.up.railway.app', 'http://localhost:5173']  
+CSRF_TRUSTED_ORIGINS = ['https://interview-backend-production-bdf0.up.railway.app', "https://talent-scout-flax.vercel.app"]  
 CORS_ALLOW_CREDENTIALS = True
 CORS_ORIGIN_WHITELIST = [
-    'http://localhost:5173',  # Add your frontend URL
+    'https://talent-scout-flax.vercel.app'
 ]
+
 # Your other imports and settings...
 
 SIMPLE_JWT = {
