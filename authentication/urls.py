@@ -15,7 +15,7 @@ from .views import (
 
 
 )
-from .views import health_check,get_candidate_profile_image, upload_candidate_profile_image,get_recruiter_profile_image,upload_recruiter_profile_image,recruiter_registration_request
+from .views import get_candidate_profile_image, upload_candidate_profile_image,get_recruiter_profile_image,upload_recruiter_profile_image,recruiter_registration_request
 
 from django.urls import path
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -42,6 +42,6 @@ urlpatterns = [
     path('candidate/profile/', CandidateProfileView.as_view(), name='candidate-profile'),
     path('recruiter/profile/', RecruiterProfileView.as_view(), name='candidate-profile'),
     path('candidate/resume/', CandidateResumeUploadView.as_view(), name='candidate-resume'),
-    path('health/', health_check, name='health_check'),
+    
 
 ]

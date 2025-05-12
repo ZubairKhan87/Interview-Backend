@@ -20,7 +20,7 @@ from django.conf import settings  # Add this import
 from django.contrib import admin
 from django.urls import path, include
 from django.conf.urls.static import static  # Add this import
-
+from authentication.views import health_check  # Import the health check view
 urlpatterns = [
     path('admin/', admin.site.urls),
     
@@ -32,6 +32,8 @@ urlpatterns = [
     path('api/chat/', include('interview.urls')),  # Include URLs from the chatbot app
     # path('api/confidence_prediction/', include('confidence_prediction.urls')),  # Add this line
     path('auth/', include('social_django.urls', namespace='social')),  # Adds Google OAuth endpoints
+    
+    path('health/', health_check, name='health_check'),
 
 
 ]
