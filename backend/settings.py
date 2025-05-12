@@ -36,9 +36,11 @@ DEBUG = True
 ALLOWED_HOSTS = ['localhost',
     '127.0.0.1',
     '.railway.app',
-    'healthcheck.railway.app',  # Specifically for health checks
+    'healthcheck.railway.app',
+    "/health/",
     'interview-backend-production-bdf0.up.railway.app']
-
+# Make sure Django binds to the port provided by Railway
+PORT = os.environ.get('PORT', '8000')
 
 # Application definition
 

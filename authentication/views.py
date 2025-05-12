@@ -779,3 +779,12 @@ AI Interviewing System
             {"error": str(e)},
             status=status.HTTP_400_BAD_REQUEST
         )
+
+
+
+
+# In one of your apps' views.py or create a new file health_check.py
+from django.http import JsonResponse
+
+def health_check(request):
+    return JsonResponse({"status": "healthy"})
