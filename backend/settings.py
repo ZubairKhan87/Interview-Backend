@@ -105,7 +105,6 @@ AUTHENTICATION_BACKENDS = (
 )
 # CORS settings
 CORS_ALLOWED_ORIGINS = [
-    "interview-backend-production-bdf0.up.railway.app",
     "https://talent-scout-flax.vercel.app",
 ]
 
