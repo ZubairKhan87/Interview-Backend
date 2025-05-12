@@ -1,23 +1,5 @@
 [phases.setup]
-nixPkgs = [
-  "python38",
-  "postgresql",
-  "libGL",
-  "glib",
-  "xorg.libSM",
-  "xorg.libXrender",
-  "xorg.libXext",
-  "mesa"
-]
-
-[phases.install]
-cmds = [
-  "python -m pip install --upgrade pip",
-  "pip install -r requirements.txt"
-]
-
-[phases.start]
-cmd = "gunicorn backend.wsgi:application"
+nixPkgs = ["python38", "postgresql"]
 
 [variables]
 PYTHONUNBUFFERED = "1"
