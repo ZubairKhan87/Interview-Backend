@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     curl \
     git \
+    libgl1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install pipenv (optional, otherwise you just use pip)
