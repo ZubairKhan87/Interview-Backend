@@ -18,8 +18,7 @@ from django.views.decorators.csrf import csrf_exempt
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication
 from job_posting.models import JobPostingTable, ApplicationTable
 from authentication.models import CandidateTable
-# from groq import Groq
-import groq  # Import the groq module instead of the Groq class
+from groq import Groq
 
 from pathlib import Path
 
@@ -28,8 +27,9 @@ env_path = Path(__file__).resolve().parent.parent / '.env'
 load_dotenv(dotenv_path=env_path)
 # print(huggingface_hub._version_)
 # Initialize the inference client
-client = groq.Client(api_key=os.getenv('GROQ_API_KEY'))  
-# Use Client instead of Groq# job = "Python programmer"
+client = Groq(api_key=os.getenv('GROQ_API_KEY'))
+
+# job = "Python programmer"
 # Skills="Object oriented programming, functions, and Data structures"
 # candidate_name="Faizaaaan"
 # experience="Fresher"
