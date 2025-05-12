@@ -20,7 +20,9 @@ from django.conf import settings  # Add this import
 from django.contrib import admin
 from django.urls import path, include
 from django.conf.urls.static import static  # Add this import
-from authentication.views import health_check  # Import the health check view
+from django.http import JsonResponse
+def health_check(request):
+    return JsonResponse({"status": "Backend is running", "message": "React not yet deployed"})
 urlpatterns = [
     path('admin/', admin.site.urls),
     
@@ -33,7 +35,7 @@ urlpatterns = [
     # path('api/confidence_prediction/', include('confidence_prediction.urls')),  # Add this line
     path('auth/', include('social_django.urls', namespace='social')),  # Adds Google OAuth endpoints
     
-    path('/', health_check, name='health_check'),
+    path('', health_check, name='health_check'),
 
 
 ]
