@@ -33,7 +33,11 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-secret-key')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['interview-backend-production-bdf0.up.railway.app']
+ALLOWED_HOSTS = ['localhost',
+    '127.0.0.1',
+    '.railway.app',
+    'healthcheck.railway.app',  # Specifically for health checks
+    'interview-backend-production-bdf0.up.railway.app']
 
 
 # Application definition
