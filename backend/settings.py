@@ -177,34 +177,62 @@ CSRF_COOKIE_SAMESITE = 'Lax'
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv("DB_NAME"),  # Name of your PostgreSQL database
-        'USER': os.getenv("DB_USER"),  # PostgreSQL username
-        'PASSWORD': os.getenv("DB_PASSWORD"),  # PostgreSQL password
-        'HOST': os.getenv("DB_HOST"),  # Assuming you're running PostgreSQL locally
-        'PORT': os.getenv("DB_PORT"),  # Default PostgreSQL port
-        'CONN_MAX_AGE': 60,  # Keep DB connections open for 60 seconds
-        'sslmode': 'require',
-
-
-
-    }
-}
-DATABASES['default']['OPTIONS'] = {
-    'sslmode': 'require',
-}
-
-POSTGRES_LOCALLY = False  # Set to True if you're running PostgreSQL locally
-ENVIRONMENT = os.getenv("ENVIRONMENT", "development")  # default to development
-import dj_database_url
+# Database Configuration for Django
 import os
-if ENVIRONMENT == 'production' or POSTGRES_LOCALLY==True:
-    DATABASES = {
-        'default': dj_database_url.parse(os.getenv("DATABASE_URL"))
-    }
+import dj_database_url
 
+# Environment detection
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+POSTGRES_LOCALLY = os.getenv("POSTGRES_LOCALLY", "False").lower() == "true"
+
+# Default configuration for PostgreSQL (used when individual environment variables are set)
+DEFAULT_DB = {
+    'ENGINE': 'django.db.backends.postgresql',
+    'NAME': os.getenv("DB_NAME"),
+    'USER': os.getenv("DB_USER"),
+    'PASSWORD': os.getenv("DB_PASSWORD"),
+    'HOST': os.getenv("DB_HOST"),
+    'PORT': os.getenv("DB_PORT", "5432"),
+    'CONN_MAX_AGE': 60,
+    'OPTIONS': {
+        'sslmode': 'require',
+    }
+}
+
+# SQLite fallback for development
+SQLITE_DB = {
+    'ENGINE': 'django.db.backends.sqlite3',
+    'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+}
+
+# Use DATABASE_URL if available (takes precedence)
+if os.getenv("DATABASE_URL"):
+    # Parse the DATABASE_URL
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=os.getenv("DATABASE_URL"),
+            conn_max_age=600,
+            ssl_require=True,
+        )
+    }
+# Otherwise, use individual environment variables if they're set
+elif all([os.getenv("DB_NAME"), os.getenv("DB_USER"), os.getenv("DB_PASSWORD"), os.getenv("DB_HOST")]):
+    DATABASES = {'default': DEFAULT_DB}
+# Fall back to SQLite if nothing else is configured
+else:
+    DATABASES = {'default': SQLITE_DB}
+
+# For debugging database connection issues
+if os.getenv("DEBUG_DB", "False").lower() == "true":
+    import sys
+    print(f"Environment: {ENVIRONMENT}", file=sys.stderr)
+    print(f"Database URL present: {'Yes' if os.getenv('DATABASE_URL') else 'No'}", file=sys.stderr)
+    print(f"Database Engine: {DATABASES['default'].get('ENGINE', 'Not set')}", file=sys.stderr)
+    if os.getenv("DATABASE_URL"):
+        # Don't print actual credentials but show we're using the URL
+        print("Using DATABASE_URL for connection", file=sys.stderr)
+    else:
+        print(f"DB Host: {os.getenv('DB_HOST', 'Not set')}", file=sys.stderr)
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
