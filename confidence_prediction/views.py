@@ -247,7 +247,6 @@ class FaceVerificationView(APIView):
             logger.error(f"Verification error: {str(e)}")
             return {"error": f"Verification failed: {str(e)}"}
 
-
     def post(self, request):
         try:
             # Get and validate reference image
