@@ -144,7 +144,10 @@ class FaceVerificationView(APIView):
             # Save temp_target_path
             Image.fromarray(target_img).save(temp_target_path, format="JPEG", quality=95)
             try:
-                client = Client("bairi56/face-verification")
+                client = Client(
+                    "bairi56/face-verification",
+                    httpx_kwargs={"transport": requests.adapters.HTTPAdapter()}  # force HTTP instead of WS
+                )
 
                 # Send images to Hugging Face API
                 result = client.predict(
@@ -321,7 +324,10 @@ class FaceVerificationCheat(APIView):
         try:
             print("Single frame condition is running")
 
-            client = Client("bairi56/face-verification")
+            client = Client(
+                    "bairi56/face-verification",
+                    httpx_kwargs={"transport": requests.adapters.HTTPAdapter()}  # force HTTP instead of WS
+                )
 
             result = client.predict(
                 frame_path,
