@@ -151,7 +151,6 @@ class FaceVerificationView(APIView):
                 client = Client(
                     "bairi56/face-verification",
                     hf_token=os.getenv("HF_API_TOKEN"),
-                    protocol="http"  # Use HTTP instead of WebSocket
                 )
 
                 # Send images to Hugging Face API
