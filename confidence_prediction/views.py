@@ -33,7 +33,10 @@ logger = logging.getLogger(__name__)
 import requests
 import uuid
 logger = logging.getLogger(__name__)
-
+from pathlib import Path
+from dotenv import load_dotenv
+env_path = Path(__file__).resolve().parent.parent / '.env'
+load_dotenv(dotenv_path=env_path)
 class FaceVerificationView(APIView):
     permission_classes = [IsAuthenticated]
     TARGET_SIZE = (640, 480)  # Standard size for processing
@@ -144,18 +147,10 @@ class FaceVerificationView(APIView):
             # Save temp_target_path
             Image.fromarray(target_img).save(temp_target_path, format="JPEG", quality=95)
             try:
-                import httpx
-            
-                # Create custom httpx client with desired settings
-                http_client = httpx.Client(
-                    timeout=60.0,
-                    headers={"User-Agent": "Django-Application"},
-                    follow_redirects=True
+                client = Client(
+                    "bairi56/face-verification",
+                    hf_token=os.environ.get("HF_API_TOKEN")  # Add this line
                 )
-                client = Client("bairi56/face-verification")
-                # Try to inject the custom client (might work on some versions)
-                if hasattr(client, "_client"):
-                    client._client = http_client
 
                 # Send images to Hugging Face API
                 result = client.predict(
@@ -332,10 +327,11 @@ class FaceVerificationCheat(APIView):
         try:
             print("Single frame condition is running")
 
-            client = Client("bairi56/face-verification")
-            # Then modify the underlying HTTP client
-            client.client.headers.update({"User-Agent": "Django-Application"})
-            client.client.timeout = 60.0  # Set timeout to 60 seconds
+            # client = Client("bairi56/face-verification")
+            client = Client(
+                "bairi56/face-verification",
+                hf_token=os.environ.get("HF_API_TOKEN")  # Add this line
+            )
 
             result = client.predict(
                 frame_path,
@@ -426,12 +422,6 @@ class FaceVerificationCheat(APIView):
 
 
 # confidence_prediction/views.py
-from pathlib import Path
-from dotenv import load_dotenv
-env_path = Path(__file__).resolve().parent.parent / '.env'
-load_dotenv(dotenv_path=env_path)
-
-
 class ConfidencePredictor:
     def __init__(self):
         # Initialize the Hugging Face client
