@@ -5,14 +5,23 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-import cv2
 import numpy as np
-from mtcnn import MTCNN
-from deepface import DeepFace
 import os
 from django.conf import settings
 import logging
-
+import os
+import requests
+from io import BytesIO
+import threading
+from gradio_client import Client
+import tempfile
+import re
+import cloudinary
+import cloudinary.uploader
+import requests
+import re
+from PIL import Image, ImageOps
+import numpy as np
 logger = logging.getLogger(__name__)
 
 from rest_framework.views import APIView
@@ -27,167 +36,10 @@ logger = logging.getLogger(__name__)
 
 class FaceVerificationView(APIView):
     permission_classes = [IsAuthenticated]
-    TARGET_SIZE = (224, 224)  # Smaller size for memory efficiency
-
-    def get_image_path(self, image_url):
-        if not image_url or image_url == 'null':
-            raise ValueError("No profile image URL provided")
-
-        try:
-            if image_url.startswith('http'):
-                temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp')
-                os.makedirs(temp_dir, exist_ok=True)
-
-                filename = f"cloud_{uuid.uuid4().hex}.jpg"
-                file_path = os.path.join(temp_dir, filename)
-
-                response = requests.get(image_url)
-                if response.status_code != 200:
-                    raise ValueError(f"Failed to download image from {image_url}")
-                
-                with open(file_path, 'wb') as f:
-                    f.write(response.content)
-                return file_path
-
-            if '/media/' in image_url:
-                media_index = image_url.find('/media/')
-                path_after_media = image_url[media_index + 7:]
-                absolute_path = os.path.join(settings.MEDIA_ROOT, path_after_media)
-                if not os.path.exists(absolute_path):
-                    raise ValueError(f"Profile image not found at: {absolute_path}")
-                return absolute_path
-
-            raise ValueError(f"Unrecognized image URL format: {image_url}")
-
-        except Exception as e:
-            logger.error("Error processing image path: %s", str(e))
-            raise ValueError(f"Error processing image path: {str(e)}")
-
-    def preprocess_image(self, image_path):
-        try:
-            img = cv2.imread(image_path)
-            if img is None:
-                raise ValueError("Could not read image")
-
-            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-            h, w = img_rgb.shape[:2]
-            target_w, target_h = self.TARGET_SIZE
-            scale = min(target_w / w, target_h / h)
-            new_w, new_h = int(w * scale), int(h * scale)
-            resized = cv2.resize(img_rgb, (new_w, new_h))
-
-            canvas = np.zeros((target_h, target_w, 3), dtype=np.uint8)
-            y_offset = (target_h - new_h) // 2
-            x_offset = (target_w - new_w) // 2
-            canvas[y_offset:y_offset + new_h, x_offset:x_offset + new_w] = resized
-
-            return canvas
-        except Exception as e:
-            logger.error(f"Image preprocessing error: {str(e)}")
-            raise ValueError(f"Image preprocessing failed: {str(e)}")
-
-    def verify_faces(self, ref_img_path, target_img_path):
-        try:
-            ref_img = self.preprocess_image(ref_img_path)
-            target_img = self.preprocess_image(target_img_path)
-
-            temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp')
-            os.makedirs(temp_dir, exist_ok=True)
-
-            temp_ref_path = os.path.join(temp_dir, 'temp_ref.jpg')
-            temp_target_path = os.path.join(temp_dir, 'temp_target.jpg')
-
-            cv2.imwrite(temp_ref_path, cv2.cvtColor(ref_img, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 95])
-            cv2.imwrite(temp_target_path, cv2.cvtColor(target_img, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 95])
-
-            try:
-                result = DeepFace.verify(
-                    img1_path=temp_ref_path,
-                    img2_path=temp_target_path,
-                    model_name="Facenet",
-                    detector_backend='retinaface',  # ✅ lightweight detector
-                    enforce_detection=False,
-                    align=True
-                )
-
-                return {
-                    "match": result["verified"],
-                    "confidence": round((1 - result.get("distance", 0)) * 100, 2)
-                }
-
-            finally:
-                for path in [temp_ref_path, temp_target_path]:
-                    try:
-                        if os.path.exists(path):
-                            os.remove(path)
-                    except Exception:
-                        pass
-
-        except Exception as e:
-            logger.error(f"Verification error: {str(e)}")
-            return {"error": f"Verification failed: {str(e)}"}
-
-    def post(self, request):
-        try:
-            ref_image = request.FILES.get('ref_image')
-            if not ref_image:
-                return Response({"error": "No reference image provided"}, status=status.HTTP_400_BAD_REQUEST)
-
-            target_image = request.data.get('target_image')
-            if not target_image or target_image == 'null':
-                return Response(
-                    {"error": "No profile image found. Please upload your profile image first."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            try:
-                target_image_path = self.get_image_path(target_image)
-            except ValueError as e:
-                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-            temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp')
-            os.makedirs(temp_dir, exist_ok=True)
-
-            ref_image_path = os.path.join(temp_dir, f'ref_{request.user.id}_{ref_image.name}')
-            with open(ref_image_path, 'wb+') as destination:
-                for chunk in ref_image.chunks():
-                    destination.write(chunk)
-
-            try:
-                verification_result = self.verify_faces(ref_image_path, target_image_path)
-                if "error" in verification_result:
-                    return Response(verification_result, status=status.HTTP_400_BAD_REQUEST)
-
-                return Response(verification_result)
-
-            finally:
-                try:
-                    if os.path.exists(ref_image_path):
-                        os.remove(ref_image_path)
-                except Exception:
-                    pass
-
-        except Exception as e:
-            logger.error(f"Verification process failed: {str(e)}")
-            return Response(
-                {"error": f"Verification process failed: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-
-
-from rest_framework.permissions import IsAuthenticated,AllowAny
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
-logger = logging.getLogger(__name__)
-@method_decorator(csrf_exempt, name='dispatch')
-class FaceVerificationCheat(APIView):
-    permission_classes = [AllowAny]
+    TARGET_SIZE = (640, 480)  # Standard size for processing
 
     def __init__(self):
         super().__init__()
-        self.detector = MTCNN()
 
     def get_image_path(self, image_url):
         """Download and return local path of the profile image (Cloudinary or media)."""
@@ -229,27 +81,262 @@ class FaceVerificationCheat(APIView):
             logger.error("Error processing image path: %s", str(e))
             raise ValueError(f"Error processing image path: {str(e)}")
 
+    
+
+    def preprocess_image(self, image_path):
+        """Preprocess image for consistent size and format using Pillow."""
+        try:
+            # Open the image and convert to RGB
+            img = Image.open(image_path).convert('RGB')
+
+            # Resize while maintaining aspect ratio and padding
+            target_w, target_h = self.TARGET_SIZE
+            img_resized = ImageOps.pad(img, (target_w, target_h), color=(0, 0, 0), centering=(0.5, 0.5))
+
+            # Convert to NumPy array
+            img_array = np.array(img_resized)
+
+            return img_array
+
+        except Exception as e:
+            logger.error(f"Image preprocessing error: {str(e)}")
+            raise ValueError(f"Image preprocessing failed: {str(e)}")
+
+
+    # def validate_frame(self, frame):
+    #     """Checks if the frame contains exactly one face."""
+    #     try:
+    #         # Detect faces
+    #         faces = self.detector.detect_faces(frame)
+            
+    #         if len(faces) == 0:
+    #             return {"error": "No face detected. Please ensure your face is clearly visible."}
+    #         elif len(faces) > 1:
+    #             return {"error": "Multiple faces detected. Please ensure only your face is in the frame."}
+            
+    #         face = faces[0]
+    #         if face['confidence'] < 0.85:
+    #             return {"error": "Face not clear enough. Please ensure good lighting and look directly at the camera."}
+
+    #         return {"valid": True}
+    #     except Exception as e:
+    #         logger.error(f"Face validation error: {str(e)}")
+    #         return {"error": f"Face validation failed: {str(e)}"}
+
+
+    def verify_faces(self, ref_img_path, target_img_path): 
+        """Verifies whether the faces in two images belong to the same person using deployed HF API."""
+        try:
+            # Preprocess images
+            ref_img = self.preprocess_image(ref_img_path)
+            target_img = self.preprocess_image(target_img_path)
+
+            # Save preprocessed images temporarily
+            temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp')
+            os.makedirs(temp_dir, exist_ok=True)
+
+            temp_ref_path = os.path.join(temp_dir, 'temp_ref.jpg')
+            temp_target_path = os.path.join(temp_dir, 'temp_target.jpg')
+
+            # Save temp_ref_path
+            Image.fromarray(ref_img).save(temp_ref_path, format="JPEG", quality=95)
+
+            # Save temp_target_path
+            Image.fromarray(target_img).save(temp_target_path, format="JPEG", quality=95)
+            try:
+                client = Client("bairi56/face-verification")
+
+                # Send images to Hugging Face API
+                result = client.predict(
+                    img1=ref_img_path,
+                    img2=target_img_path,
+                    api_name="/predict"
+                )
+
+                # Parse result
+                if isinstance(result, str):
+                    if "Match ✅" in result:
+                        # Extract similarity percentage
+                        similarity = None
+                        try:
+                            similarity = float(result.split("Similarity:")[1].strip().replace("%", ""))
+                        except:
+                            pass
+
+                        return {
+                            "match": True,
+                            "confidence": round(similarity, 2) if similarity else None
+                        }
+
+                    elif "No face detected" in result:
+                        return {"error": "No face detected. Please ensure your face is clearly visible."}
+                    elif "Multiple faces detected" in result:
+                        return {"error": "Multiple faces detected. Please ensure only your face is in the frame."}
+                    elif "Face not clear enough" in result:
+                        return {"error": "Face not clear enough. Please ensure good lighting and look directly at the camera."}
+                    else:
+                        return {"error": result}  # fallback unknown string
+                else:
+                    return {"error": "Unexpected response from verification model."}
+            except Exception as e:
+                logger.error(f"Verification error: {str(e)}")
+                return {"error": f"Verification failed: {str(e)}"}
+
+            finally:
+                # Clean up
+                for path in [temp_ref_path, temp_target_path]:
+                    try:
+                        if os.path.exists(path):
+                            os.remove(path)
+                    except Exception:
+                        pass
+
+        except Exception as e:
+            logger.error(f"Verification error: {str(e)}")
+            return {"error": f"Verification failed: {str(e)}"}
+
+
+    def post(self, request):
+        try:
+            # Get and validate reference image
+            ref_image = request.FILES.get('ref_image')
+            print("ref_image",ref_image)
+            if not ref_image:
+                return Response(
+                    {"error": "No reference image provided"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Get and validate target image path
+            target_image = request.data.get('target_image')
+            print("target_image",target_image)
+            if not target_image or target_image == 'null':
+                return Response(
+                    {"error": "No profile image found. Please upload your profile image first."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            try:
+                target_image_path = self.get_image_path(target_image)
+            except ValueError as e:
+                return Response(
+                    {"error": str(e)},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Create temp directory if it doesn't exist
+            temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp')
+            os.makedirs(temp_dir, exist_ok=True)
+
+            # Save reference image
+            ref_image_path = os.path.join(temp_dir, f'ref_{request.user.id}_{ref_image.name}')
+            with open(ref_image_path, 'wb+') as destination:
+                for chunk in ref_image.chunks():
+                    destination.write(chunk)
+
+            try:
+                # Preprocess and validate reference image
+                ref_img = self.preprocess_image(ref_image_path)
+                # validation_result = self.validate_frame(ref_img)
+                # if "error" in validation_result:
+                #     return Response(validation_result, status=status.HTTP_400_BAD_REQUEST)
+
+                # Verify faces
+                verification_result = self.verify_faces(ref_image_path, target_image_path)
+                if "error" in verification_result:
+                    return Response(verification_result, status=status.HTTP_400_BAD_REQUEST)
+
+                return Response(verification_result)
+
+            finally:
+                # Clean up reference image
+                try:
+                    if os.path.exists(ref_image_path):
+                        os.remove(ref_image_path)
+                except Exception:
+                    pass
+
+        except Exception as e:
+            logger.error(f"Verification process failed: {str(e)}")
+            return Response(
+                {"error": f"Verification process failed: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+from rest_framework.permissions import IsAuthenticated,AllowAny
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+logger = logging.getLogger(__name__)
+@method_decorator(csrf_exempt, name='dispatch')
+class FaceVerificationCheat(APIView):
+    permission_classes = [AllowAny]
+
+    def __init__(self):
+        super().__init__()
+
+    def get_image_path(self, image_url):
+        """Download and return local path of the profile image (Cloudinary or media)."""
+        if not image_url or image_url == 'null':
+            raise ValueError("No profile image URL provided")
+
+        try:
+            # Check if it's a Cloudinary/external URL
+            if image_url.startswith('http'):
+                print("inside image_url condition",image_url)
+                temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp')
+                os.makedirs(temp_dir, exist_ok=True)
+
+                filename = f"cloud_{uuid.uuid4().hex}.jpg"
+                file_path = os.path.join(temp_dir, filename)
+                print("file_path",file_path)
+                # Download the image
+                response = requests.get(image_url)
+                if response.status_code != 200:
+                    raise ValueError(f"Failed to download image from {image_url}")
+                
+                with open(file_path, 'wb') as f:
+                    f.write(response.content)
+                print("file_path at return",file_path)
+                return file_path
+
+            # Handle local media path
+            if '/media/' in image_url:
+                media_index = image_url.find('/media/')
+                path_after_media = image_url[media_index + 7:]
+                absolute_path = os.path.join(settings.MEDIA_ROOT, path_after_media)
+                if not os.path.exists(absolute_path):
+                    raise ValueError(f"Profile image not found at: {absolute_path}")
+                return absolute_path
+
+            raise ValueError(f"Unrecognized image URL format: {image_url}")
+
+        except Exception as e:
+            logger.error("Error processing image path: %s", str(e))
+            raise ValueError(f"Error processing image path: {str(e)}")
+
+
     def verify_single_frame(self, frame_path, target_image_path):
         """Verify a single frame against the target image, returning only True/False."""
         try:
-            print("single frame condition is running")
-            # Verify faces
-            if not hasattr(self, 'face_model'):
-                self.face_model = DeepFace.build_model("SFace")
+            print("Single frame condition is running")
 
-            result = DeepFace.verify(
-                img1_path=frame_path,
-                img2_path=target_image_path,
-                model_name="SFace",
-                model=self.face_model,  # Reuse loaded model
-                detector_backend='retinaface',
-                enforce_detection=False,
-                align=True
+            client = Client("bairi56/face-verification")
+
+            result = client.predict(
+                img1=frame_path,
+                img2=target_image_path,
+                api_name="/predict"
             )
 
-            return result.get("verified", False)
+            # If it's a match, return True
+            if isinstance(result, str) and "Match ✅" in result:
+                return True
+            return False
+
         except Exception:
             return False
+
 
     def post(self, request):
         """
@@ -329,17 +416,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 env_path = Path(__file__).resolve().parent.parent / '.env'
 load_dotenv(dotenv_path=env_path)
-import os
-import requests
-from io import BytesIO
-import threading
-from gradio_client import Client
-import tempfile
-import re
-import cloudinary
-import cloudinary.uploader
-import requests
-import re
+
 
 class ConfidencePredictor:
     def __init__(self):
