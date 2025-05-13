@@ -148,8 +148,8 @@ class FaceVerificationView(APIView):
 
                 # Send images to Hugging Face API
                 result = client.predict(
-                    img1=ref_img_path,
-                    img2=target_img_path,
+                    ref_img_path,
+                    target_img_path,
                     api_name="/predict"
                 )
 
@@ -324,8 +324,8 @@ class FaceVerificationCheat(APIView):
             client = Client("bairi56/face-verification")
 
             result = client.predict(
-                img1=frame_path,
-                img2=target_image_path,
+                frame_path,
+                target_image_path,
                 api_name="/predict"
             )
 
