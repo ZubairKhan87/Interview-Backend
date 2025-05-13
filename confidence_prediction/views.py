@@ -27,38 +27,28 @@ logger = logging.getLogger(__name__)
 
 class FaceVerificationView(APIView):
     permission_classes = [IsAuthenticated]
-    TARGET_SIZE = (640, 480)  # Standard size for processing
-
-    def __init__(self):
-        super().__init__()
-        self.detector = MTCNN()
+    TARGET_SIZE = (224, 224)  # Smaller size for memory efficiency
 
     def get_image_path(self, image_url):
-        """Download and return local path of the profile image (Cloudinary or media)."""
         if not image_url or image_url == 'null':
             raise ValueError("No profile image URL provided")
 
         try:
-            # Check if it's a Cloudinary/external URL
             if image_url.startswith('http'):
-                print("inside image_url condition",image_url)
                 temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp')
                 os.makedirs(temp_dir, exist_ok=True)
 
                 filename = f"cloud_{uuid.uuid4().hex}.jpg"
                 file_path = os.path.join(temp_dir, filename)
-                print("file_path",file_path)
-                # Download the image
+
                 response = requests.get(image_url)
                 if response.status_code != 200:
                     raise ValueError(f"Failed to download image from {image_url}")
                 
                 with open(file_path, 'wb') as f:
                     f.write(response.content)
-                print("file_path at return",file_path)
                 return file_path
 
-            # Handle local media path
             if '/media/' in image_url:
                 media_index = image_url.find('/media/')
                 path_after_media = image_url[media_index + 7:]
@@ -74,130 +64,77 @@ class FaceVerificationView(APIView):
             raise ValueError(f"Error processing image path: {str(e)}")
 
     def preprocess_image(self, image_path):
-        """Preprocess image for consistent size and format."""
         try:
-            # Read image
             img = cv2.imread(image_path)
             if img is None:
                 raise ValueError("Could not read image")
-            
-            # Convert BGR to RGB
+
             img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            
-            # Resize to target size while maintaining aspect ratio
+
             h, w = img_rgb.shape[:2]
             target_w, target_h = self.TARGET_SIZE
-            
-            # Calculate scaling factor
-            scale = min(target_w/w, target_h/h)
-            new_w, new_h = int(w*scale), int(h*scale)
-            
-            # Resize image
+            scale = min(target_w / w, target_h / h)
+            new_w, new_h = int(w * scale), int(h * scale)
             resized = cv2.resize(img_rgb, (new_w, new_h))
-            
-            # Create black canvas of target size
+
             canvas = np.zeros((target_h, target_w, 3), dtype=np.uint8)
-            
-            # Calculate position to paste resized image
             y_offset = (target_h - new_h) // 2
             x_offset = (target_w - new_w) // 2
-            
-            # Paste resized image onto canvas
-            canvas[y_offset:y_offset+new_h, x_offset:x_offset+new_w] = resized
-            
+            canvas[y_offset:y_offset + new_h, x_offset:x_offset + new_w] = resized
+
             return canvas
-            
         except Exception as e:
             logger.error(f"Image preprocessing error: {str(e)}")
             raise ValueError(f"Image preprocessing failed: {str(e)}")
 
-    def validate_frame(self, frame):
-        """Checks if the frame contains exactly one face."""
-        try:
-            # Detect faces
-            faces = self.detector.detect_faces(frame)
-            
-            if len(faces) == 0:
-                return {"error": "No face detected. Please ensure your face is clearly visible."}
-            elif len(faces) > 1:
-                return {"error": "Multiple faces detected. Please ensure only your face is in the frame."}
-            
-            face = faces[0]
-            if face['confidence'] < 0.85:
-                return {"error": "Face not clear enough. Please ensure good lighting and look directly at the camera."}
-
-            return {"valid": True}
-        except Exception as e:
-            logger.error(f"Face validation error: {str(e)}")
-            return {"error": f"Face validation failed: {str(e)}"}
-
     def verify_faces(self, ref_img_path, target_img_path):
-        """Verifies whether the faces in two images belong to the same person."""
         try:
-            # Preprocess both images
             ref_img = self.preprocess_image(ref_img_path)
             target_img = self.preprocess_image(target_img_path)
-            print("ref_img",ref_img)
-            print("target_img",target_img)
-            # Save preprocessed images temporarily
+
             temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp')
             os.makedirs(temp_dir, exist_ok=True)
-            
+
             temp_ref_path = os.path.join(temp_dir, 'temp_ref.jpg')
             temp_target_path = os.path.join(temp_dir, 'temp_target.jpg')
-            
-            # Save images with high quality
+
             cv2.imwrite(temp_ref_path, cv2.cvtColor(ref_img, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 95])
             cv2.imwrite(temp_target_path, cv2.cvtColor(target_img, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 95])
-            
-            try:
-                # Perform verification with preprocessed images
-                if not hasattr(self, 'face_model'):
-                    self.face_model = DeepFace.build_model("SFace")
 
+            try:
                 result = DeepFace.verify(
                     img1_path=temp_ref_path,
                     img2_path=temp_target_path,
-                    model_name="SFace",
-                    model=self.face_model,  # Reuse loaded model
-                    detector_backend='mtcnn',
-                    enforce_detection=True,
+                    model_name="Facenet",
+                    detector_backend='retinaface',  # ✅ lightweight detector
+                    enforce_detection=False,
                     align=True
                 )
 
-                
                 return {
                     "match": result["verified"],
                     "confidence": round((1 - result.get("distance", 0)) * 100, 2)
                 }
-            
+
             finally:
-                # Clean up temporary files
                 for path in [temp_ref_path, temp_target_path]:
                     try:
                         if os.path.exists(path):
                             os.remove(path)
                     except Exception:
                         pass
-            
+
         except Exception as e:
             logger.error(f"Verification error: {str(e)}")
             return {"error": f"Verification failed: {str(e)}"}
 
     def post(self, request):
         try:
-            # Get and validate reference image
             ref_image = request.FILES.get('ref_image')
-            print("ref_image",ref_image)
             if not ref_image:
-                return Response(
-                    {"error": "No reference image provided"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                return Response({"error": "No reference image provided"}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Get and validate target image path
             target_image = request.data.get('target_image')
-            print("target_image",target_image)
             if not target_image or target_image == 'null':
                 return Response(
                     {"error": "No profile image found. Please upload your profile image first."},
@@ -207,29 +144,17 @@ class FaceVerificationView(APIView):
             try:
                 target_image_path = self.get_image_path(target_image)
             except ValueError as e:
-                return Response(
-                    {"error": str(e)},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Create temp directory if it doesn't exist
             temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp')
             os.makedirs(temp_dir, exist_ok=True)
 
-            # Save reference image
             ref_image_path = os.path.join(temp_dir, f'ref_{request.user.id}_{ref_image.name}')
             with open(ref_image_path, 'wb+') as destination:
                 for chunk in ref_image.chunks():
                     destination.write(chunk)
 
             try:
-                # Preprocess and validate reference image
-                ref_img = self.preprocess_image(ref_image_path)
-                validation_result = self.validate_frame(ref_img)
-                if "error" in validation_result:
-                    return Response(validation_result, status=status.HTTP_400_BAD_REQUEST)
-
-                # Verify faces
                 verification_result = self.verify_faces(ref_image_path, target_image_path)
                 if "error" in verification_result:
                     return Response(verification_result, status=status.HTTP_400_BAD_REQUEST)
@@ -237,7 +162,6 @@ class FaceVerificationView(APIView):
                 return Response(verification_result)
 
             finally:
-                # Clean up reference image
                 try:
                     if os.path.exists(ref_image_path):
                         os.remove(ref_image_path)
@@ -250,6 +174,7 @@ class FaceVerificationView(APIView):
                 {"error": f"Verification process failed: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
 
 
 from rest_framework.permissions import IsAuthenticated,AllowAny
@@ -317,7 +242,7 @@ class FaceVerificationCheat(APIView):
                 img2_path=target_image_path,
                 model_name="SFace",
                 model=self.face_model,  # Reuse loaded model
-                detector_backend='mtcnn',
+                detector_backend='retinaface',
                 enforce_detection=False,
                 align=True
             )
