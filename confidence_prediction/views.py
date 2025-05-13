@@ -144,10 +144,18 @@ class FaceVerificationView(APIView):
             # Save temp_target_path
             Image.fromarray(target_img).save(temp_target_path, format="JPEG", quality=95)
             try:
+                import httpx
+            
+                # Create custom httpx client with desired settings
+                http_client = httpx.Client(
+                    timeout=60.0,
+                    headers={"User-Agent": "Django-Application"},
+                    follow_redirects=True
+                )
                 client = Client("bairi56/face-verification")
-                # Then modify the underlying HTTP client
-                client.client.headers.update({"User-Agent": "Django-Application"})
-                client.client.timeout = 60.0  # Set timeout to 60 seconds
+                # Try to inject the custom client (might work on some versions)
+                if hasattr(client, "_client"):
+                    client._client = http_client
 
                 # Send images to Hugging Face API
                 result = client.predict(
