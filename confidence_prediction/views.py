@@ -149,7 +149,7 @@ class FaceVerificationView(APIView):
             try:
                 client = Client(
                     "bairi56/face-verification",
-                    hf_token=os.environ.get("HF_API_TOKEN")  # Add this line
+                    hf_token=os.getenv("HF_API_TOKEN")  # Add this line
                 )
 
                 # Send images to Hugging Face API
@@ -330,7 +330,7 @@ class FaceVerificationCheat(APIView):
             # client = Client("bairi56/face-verification")
             client = Client(
                 "bairi56/face-verification",
-                hf_token=os.environ.get("HF_API_TOKEN")  # Add this line
+                hf_token=os.getenv("HF_API_TOKEN")  # Add this line
             )
 
             result = client.predict(
