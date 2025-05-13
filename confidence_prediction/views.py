@@ -153,12 +153,12 @@ class FaceVerificationView(APIView):
             try:
                 # Perform verification with preprocessed images
                 if not hasattr(self, 'face_model'):
-                    self.face_model = DeepFace.build_model("Facenet")
+                    self.face_model = DeepFace.build_model("SFace")
 
                 result = DeepFace.verify(
                     img1_path=temp_ref_path,
                     img2_path=temp_target_path,
-                    model_name="Facenet",
+                    model_name="SFace",
                     model=self.face_model,  # Reuse loaded model
                     detector_backend='mtcnn',
                     enforce_detection=True,
@@ -310,12 +310,12 @@ class FaceVerificationCheat(APIView):
             print("single frame condition is running")
             # Verify faces
             if not hasattr(self, 'face_model'):
-                self.face_model = DeepFace.build_model("Facenet")
+                self.face_model = DeepFace.build_model("SFace")
 
             result = DeepFace.verify(
                 img1_path=frame_path,
                 img2_path=target_image_path,
-                model_name="Facenet",
+                model_name="SFace",
                 model=self.face_model,  # Reuse loaded model
                 detector_backend='mtcnn',
                 enforce_detection=False,
