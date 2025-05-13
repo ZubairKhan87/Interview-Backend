@@ -146,35 +146,46 @@ class FaceVerificationView(APIView):
 
             # Save temp_target_path
             Image.fromarray(target_img).save(temp_target_path, format="JPEG", quality=95)
+            
             try:
                 client = Client(
                     "bairi56/face-verification",
-                    hf_token=os.getenv("HF_API_TOKEN"),  # Add this line
-
+                    hf_token=os.getenv("HF_API_TOKEN"),
+                    protocol="http"  # Use HTTP instead of WebSocket
                 )
-                print("client",client)
+
                 # Send images to Hugging Face API
                 result = client.predict(
-                    ref_img_path,
-                    target_img_path,
+                    temp_ref_path,  # Changed to use temporary files
+                    temp_target_path,
                     api_name="/predict"
                 )
+                
+                # Log the raw response for debugging
+                logger.info(f"Raw API response: {result}")
 
-                # Parse result
+                # Parse result properly as a string
                 if isinstance(result, str):
-                    if "Match ✅" in result:
-                        # Extract similarity percentage
+                    if "Match: Yes" in result or "Match ✅" in result:
+                        # Extract similarity score
                         similarity = None
                         try:
-                            similarity = float(result.split("Similarity:")[1].strip().replace("%", ""))
-                        except:
-                            pass
-
+                            # Look for "Similarity Score: X.XXXX" pattern
+                            import re
+                            match = re.search(r"Similarity Score: (\d+\.\d+)", result)
+                            if match:
+                                similarity = float(match.group(1))
+                        except Exception as e:
+                            logger.warning(f"Failed to extract similarity score: {str(e)}")
+                            
                         return {
                             "match": True,
-                            "confidence": round(similarity, 2) if similarity else None
+                            "confidence": round(similarity * 100, 2) if similarity else None,
+                            "raw_response": result  # Include raw response for debugging
                         }
-
+                        
+                    elif "too dark or unclear" in result:
+                        return {"error": "Face in Target Image is too dark or unclear. Ensure good lighting and look directly at the camera."}
                     elif "No face detected" in result:
                         return {"error": "No face detected. Please ensure your face is clearly visible."}
                     elif "Multiple faces detected" in result:
@@ -182,9 +193,11 @@ class FaceVerificationView(APIView):
                     elif "Face not clear enough" in result:
                         return {"error": "Face not clear enough. Please ensure good lighting and look directly at the camera."}
                     else:
-                        return {"error": result}  # fallback unknown string
+                        # Return a more specific error based on the actual response
+                        return {"error": f"Verification failed: {result}", "raw_response": result}
                 else:
-                    return {"error": "Unexpected response from verification model."}
+                    return {"error": "Unexpected response format from verification model."}
+                    
             except Exception as e:
                 logger.error(f"Verification error: {str(e)}")
                 return {"error": f"Verification failed: {str(e)}"}
