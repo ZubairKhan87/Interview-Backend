@@ -1,4 +1,6 @@
 # views.py
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # 👈 Disable GPU checks (MUST be before tensorflow/deepface imports)
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -17,27 +19,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from mtcnn import MTCNN
-from deepface import DeepFace
-import cv2
-import os
-import logging
-from django.conf import settings
-import numpy as np
 
 logger = logging.getLogger(__name__)
-
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
-from mtcnn import MTCNN
-from deepface import DeepFace
-import cv2
-import os
-import logging
-import numpy as np
-from django.conf import settings
 import requests
 import uuid
 logger = logging.getLogger(__name__)
@@ -169,14 +152,19 @@ class FaceVerificationView(APIView):
             
             try:
                 # Perform verification with preprocessed images
+                if not hasattr(self, 'face_model'):
+                    self.face_model = DeepFace.build_model("Facenet")
+
                 result = DeepFace.verify(
                     img1_path=temp_ref_path,
                     img2_path=temp_target_path,
                     model_name="Facenet",
+                    model=self.face_model,  # Reuse loaded model
                     detector_backend='mtcnn',
-                    enforce_detection=False,  # Set to False to handle edge cases
+                    enforce_detection=True,
                     align=True
                 )
+
                 
                 return {
                     "match": result["verified"],
@@ -264,16 +252,7 @@ class FaceVerificationView(APIView):
             )
 
 
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
 from rest_framework.permissions import IsAuthenticated,AllowAny
-from mtcnn import MTCNN
-from deepface import DeepFace
-import cv2
-import os
-import logging
-from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 logger = logging.getLogger(__name__)
@@ -330,14 +309,19 @@ class FaceVerificationCheat(APIView):
         try:
             print("single frame condition is running")
             # Verify faces
+            if not hasattr(self, 'face_model'):
+                self.face_model = DeepFace.build_model("Facenet")
+
             result = DeepFace.verify(
                 img1_path=frame_path,
                 img2_path=target_image_path,
                 model_name="Facenet",
+                model=self.face_model,  # Reuse loaded model
                 detector_backend='mtcnn',
-                enforce_detection=False,  # Changed to False to avoid errors on unclear frames
+                enforce_detection=False,
                 align=True
             )
+
             return result.get("verified", False)
         except Exception:
             return False
@@ -416,13 +400,6 @@ class FaceVerificationCheat(APIView):
 
 
 # confidence_prediction/views.py
-
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-import numpy as np
-# import tensorflow as tf
-# from mtcnn import MTCNN
-# import cv2
 from pathlib import Path
 from dotenv import load_dotenv
 env_path = Path(__file__).resolve().parent.parent / '.env'
