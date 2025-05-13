@@ -144,10 +144,10 @@ class FaceVerificationView(APIView):
             # Save temp_target_path
             Image.fromarray(target_img).save(temp_target_path, format="JPEG", quality=95)
             try:
-                client = Client(
-                    "bairi56/face-verification",
-                    httpx_kwargs={"transport": requests.adapters.HTTPAdapter()}  # force HTTP instead of WS
-                )
+                client = Client("bairi56/face-verification")
+                # Then modify the underlying HTTP client
+                client.client.headers.update({"User-Agent": "Django-Application"})
+                client.client.timeout = 60.0  # Set timeout to 60 seconds
 
                 # Send images to Hugging Face API
                 result = client.predict(
@@ -324,10 +324,10 @@ class FaceVerificationCheat(APIView):
         try:
             print("Single frame condition is running")
 
-            client = Client(
-                    "bairi56/face-verification",
-                    httpx_kwargs={"transport": requests.adapters.HTTPAdapter()}  # force HTTP instead of WS
-                )
+            client = Client("bairi56/face-verification")
+            # Then modify the underlying HTTP client
+            client.client.headers.update({"User-Agent": "Django-Application"})
+            client.client.timeout = 60.0  # Set timeout to 60 seconds
 
             result = client.predict(
                 frame_path,
