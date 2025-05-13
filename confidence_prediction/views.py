@@ -431,7 +431,7 @@ import os
 import requests
 from io import BytesIO
 import threading
-from gradio_client import Client, handle_file
+from gradio_client import Client
 import tempfile
 import re
 import cloudinary
@@ -464,9 +464,10 @@ class ConfidencePredictor:
             try:
                 # Make prediction using the Hugging Face model
                 result = self.client.predict(
-                    image=handle_file(temp_path),
+                    image=temp_path,      # Just pass the path directly
                     api_name="/predict"
                 )
+
                 
                 
                 # Process the result based on  model's output format
