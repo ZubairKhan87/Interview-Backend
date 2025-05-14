@@ -39,7 +39,7 @@ ALLOWED_HOSTS = [
     '127.0.0.1',
     '.railway.app',
     'healthcheck.railway.app',
-    'interview-backend-production-bdf0.up.railway.app',
+    'https://interview-backend-production-bdf0.up.railway.app',
     "https://talent-scout-flax.vercel.app",
 
 ]
@@ -276,7 +276,7 @@ USE_I18N = True
 USE_TZ = True
 
 # settings.py(Using it while applying doing face verification)
-BASE_URL = 'interview-backend-production-bdf0.up.railway.app'  # For development
+BASE_URL = 'https://interview-backend-production-bdf0.up.railway.app'  # For development
 # BASE_URL = 'https://your-domain.com'  # For production
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/

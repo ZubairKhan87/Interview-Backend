@@ -402,8 +402,8 @@ def chatbot_response(request):
                         #     application.flag_status = True   # Poor verification rate
 
                         application.save()
-                        print(f"Successfully updated marks and verification results")
-                        print(f"Successfully saved results. Verification rate: {verification_rate}%, Flag status: {application.flag_status}")
+                        # print(f"Successfully updated marks and verification results")
+                        # print(f"Successfully saved results. Verification rate: {verification_rate}%, Flag status: {application.flag_status}")
 
                     except ApplicationTable.DoesNotExist:
                         print("Application not found")
