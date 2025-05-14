@@ -148,50 +148,19 @@ class FaceVerificationView(APIView):
             Image.fromarray(target_img).save(temp_target_path, format="JPEG", quality=95)
             
             try:
-                # Configure the Hugging Face API client with proper authentication
-                hf_token = os.getenv("HF_API_TOKEN")
-                if not hf_token:
-                    logger.error("HF_API_TOKEN environment variable is not set")
-                    return {"error": "API authentication failed: Missing API token"}
-                    
-                # Omit protocol parameter since your version doesn't support it
                 client = Client(
                     "bairi56/face-verification",
-                    hf_token=hf_token
+                    hf_token=os.getenv("HF_API_TOKEN"),
                 )
+                print("client",client)
+                print("HF_API_TOKEN",os.getenv("HF_API_TOKEN"))
 
-                # Try sending images as base64 encoded strings instead of file paths
-                import base64
-                
-                # Convert images to base64
-                def image_to_base64(image_path):
-                    with open(image_path, "rb") as img_file:
-                        return base64.b64encode(img_file.read()).decode('utf-8')
-                
-                try:
-                    # First try with file paths
-                    result = client.predict(
-                        temp_ref_path,
-                        temp_target_path,
-                        api_name="/predict"
-                    )
-                except Exception as path_error:
-                    logger.warning(f"File path method failed: {str(path_error)}")
-                    
-                    # If that fails, try with base64 encoding
-                    try:
-                        ref_base64 = image_to_base64(temp_ref_path)
-                        target_base64 = image_to_base64(temp_target_path)
-                        
-                        result = client.predict(
-                            ref_base64,
-                            target_base64,
-                            api_name="/predict"
-                        )
-                    except Exception as base64_error:
-                        logger.error(f"Base64 method also failed: {str(base64_error)}")
-                        raise Exception(f"All API connection methods failed: {str(path_error)} | {str(base64_error)}")
-                
+                # Send images to Hugging Face API
+                result = client.predict(
+                    temp_ref_path,  # Changed to use temporary files
+                    temp_target_path,
+                    api_name="/predict"
+                )
                 
                 # Log the raw response for debugging
                 logger.info(f"Raw API response: {result}")
@@ -246,6 +215,7 @@ class FaceVerificationView(APIView):
         except Exception as e:
             logger.error(f"Verification error: {str(e)}")
             return {"error": f"Verification failed: {str(e)}"}
+
 
     def post(self, request):
         try:
