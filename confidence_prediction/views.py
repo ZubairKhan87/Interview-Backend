@@ -102,159 +102,67 @@ class FaceVerificationView(APIView):
             raise ValueError(f"Image preprocessing failed: {str(e)}")
 
     def verify_faces(self, ref_img_path, target_img_path): 
-        """Verifies whether the faces in two images belong to the same person using deployed HF API."""
         try:
+            # Initialize Hugging Face token
+            hf_token = os.getenv("HF_API_TOKEN")
+            if not hf_token:
+                logger.error("HF_API_TOKEN not found in environment")
+                return {"error": "API configuration error. Please contact support."}
+
             # Preprocess images
             ref_img = self.preprocess_image(ref_img_path)
             target_img = self.preprocess_image(target_img_path)
 
-            # Save preprocessed images temporarily
+            # Save images temporarily
             temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp')
             os.makedirs(temp_dir, exist_ok=True)
 
-            temp_ref_path = os.path.join(temp_dir, f'temp_ref_{uuid.uuid4().hex}.jpg')
-            temp_target_path = os.path.join(temp_dir, f'temp_target_{uuid.uuid4().hex}.jpg')
+            ref_temp = os.path.join(temp_dir, f"ref_{uuid.uuid4().hex}.jpg")
+            target_temp = os.path.join(temp_dir, f"target_{uuid.uuid4().hex}.jpg")
 
-            # Save temp files
-            Image.fromarray(ref_img).save(temp_ref_path, format="JPEG", quality=95)
-            Image.fromarray(target_img).save(temp_target_path, format="JPEG", quality=95)
-            
-            try:
-                # APPROACH: Use direct HTTP requests instead of gradio_client
-                # This is a fallback method since gradio_client is returning HTML instead of JSON
-                
-                hf_token = os.getenv("HF_API_TOKEN")
-                if not hf_token:
-                    logger.error("HF_API_TOKEN not found in environment variables")
-                    # Use hardcoded token as fallback for testing only (remove in production)
-                    hf_token = "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"  # This is from your test code
-                    logger.warning("Using fallback token for testing. Remove in production.")
-                
-                logger.info("Using direct HTTP requests instead of gradio_client")
-                
-                # Direct API access using requests
-                import requests
-                
-                # Define API URL - using the endpoint that worked in your direct check
-                api_url = "https://bairi56-face-verification.hf.space/run/predict"
-                
-                # Prepare files for multipart upload
-                files = {
-                    'img1': ('ref_image.jpg', open(temp_ref_path, 'rb'), 'image/jpeg'),
-                    'img2': ('target_image.jpg', open(temp_target_path, 'rb'), 'image/jpeg')
-                }
-                
-                # Prepare headers with authentication
-                headers = {
-                    'Authorization': f'Bearer {hf_token}'
-                }
-                
-                # Make the API request
-                logger.info(f"Sending direct HTTP request to {api_url}")
-                response = requests.post(api_url, files=files, headers=headers)
-                
-                # Check response status
-                logger.info(f"API response status: {response.status_code}")
-                logger.info(f"API response headers: {response.headers}")
-                
-                # Try to parse the response
-                if response.status_code == 200:
-                    try:
-                        # Try JSON first
-                        result_data = response.json()
-                        logger.info(f"Received JSON response: {result_data}")
-                        
-                        # Extract the result (structure depends on API)
-                        result = result_data.get('data', '')
-                        if isinstance(result, list) and len(result) > 0:
-                            result = result[0]  # Common format for HF API responses
-                            
-                    except Exception as json_err:
-                        # Fall back to text response
-                        logger.warning(f"JSON parsing failed: {str(json_err)}")
-                        result = response.text
-                        logger.info(f"Using text response: {result[:200]}...")  # Log first 200 chars
-                else:
-                    return {"error": f"API request failed with status code: {response.status_code}"}
-                
-                # Process the result
-                if isinstance(result, str):
-                    if "Match: Yes" in result or "Match ✅" in result:
-                        # Extract similarity score
-                        similarity = None
-                        try:
-                            # Look for "Similarity Score: X.XXXX" pattern
-                            match = re.search(r"Similarity Score: (\d+\.\d+)", result)
-                            if match:
-                                similarity = float(match.group(1))
-                        except Exception as e:
-                            logger.warning(f"Failed to extract similarity score: {str(e)}")
-                            
-                        return {
-                            "match": True,
-                            "confidence": round(similarity * 100, 2) if similarity else None,
-                            "raw_response": result  # Include raw response for debugging
-                        }
-                        
-                    elif "too dark or unclear" in result:
-                        return {"error": "Face in Target Image is too dark or unclear. Ensure good lighting and look directly at the camera."}
-                    elif "No face detected" in result:
-                        return {"error": "No face detected. Please ensure your face is clearly visible."}
-                    elif "Multiple faces detected" in result:
-                        return {"error": "Multiple faces detected. Please ensure only your face is in the frame."}
-                    elif "Face not clear enough" in result:
-                        return {"error": "Face not clear enough. Please ensure good lighting and look directly at the camera."}
-                    else:
-                        # No match but valid response
-                        return {
-                            "match": False,
-                            "raw_response": result  # Include raw response for debugging
-                        }
-                else:
-                    # Attempt to extract information from other response formats
-                    logger.info(f"Processing non-string result: {type(result)}")
-                    logger.info(f"Result content: {result}")
-                    
-                    # Try to determine if there's a match based on the response structure
-                    # This will depend on the actual response format of your API
-                    match_found = False
-                    confidence = None
-                    
-                    # Add logic here to extract match information from the response
-                    # (This is placeholder logic and should be adjusted based on actual response)
-                    if isinstance(result, dict):
-                        if result.get('match') is not None:
-                            match_found = result.get('match')
-                        if result.get('confidence') is not None:
-                            confidence = result.get('confidence')
-                        if result.get('similarity') is not None:
-                            confidence = float(result.get('similarity')) * 100
-                    
-                    return {
-                        "match": match_found,
-                        "confidence": confidence,
-                        "raw_response": str(result)  # Convert to string for safe logging
-                    }
-                    
-            except Exception as e:
-                logger.error(f"Verification error: {str(e)}")
-                import traceback
-                logger.error(f"Traceback: {traceback.format_exc()}")
-                return {"error": f"Verification failed: {str(e)}"}
+            Image.fromarray(ref_img).save(ref_temp, format='JPEG', quality=95)
+            Image.fromarray(target_img).save(target_temp, format='JPEG', quality=95)
 
-            finally:
-                # Clean up
-                for path in [temp_ref_path, temp_target_path]:
-                    try:
-                        if os.path.exists(path):
-                            os.remove(path)
-                    except Exception:
-                        pass
+            # Initialize Gradio client
+            client = Client("bairi56/face-verification", hf_token=hf_token)
+
+            # Send API request
+            result = client.predict(
+                img1=handle_file(ref_temp),
+                img2=handle_file(target_temp),
+                api_name="/predict"
+            )
+
+            logger.info(f"HF API Result: {result}")
+
+            if isinstance(result, str):
+                match = re.search(r"Similarity Score: (\d+\.\d+)", result)
+                similarity = float(match.group(1)) if match else None
+
+                return {
+                    "match": "Match: Yes" in result or "✅" in result,
+                    "confidence": round(similarity * 100, 2) if similarity else None,
+                    "raw_response": result
+                }
+            else:
+                return {"error": "Unexpected response format from verification model."}
 
         except Exception as e:
-            logger.error(f"Verification error: {str(e)}")
+            logger.error(f"Face verification error: {str(e)}")
             return {"error": f"Verification failed: {str(e)}"}
+
+        finally:
+            # Clean up
+            for file in [ref_temp, target_temp]:
+                try:
+                    if os.path.exists(file):
+                        os.remove(file)
+                except Exception:
+                    pass
+
+
     def post(self, request):
+
         try:
             # Get and validate reference image
             ref_image = request.FILES.get('ref_image')
@@ -293,8 +201,9 @@ class FaceVerificationView(APIView):
             try:
                 # Verify faces
                 verification_result = self.verify_faces(ref_image_path, target_image_path)
+                logger.info(f"Verification Result: {verification_result}")
                 if "error" in verification_result:
-                    return Response(verification_result, status=status.HTTP_400_BAD_REQUEST)
+                    return Response("error in verification",verification_result, status=status.HTTP_400_BAD_REQUEST)
 
                 return Response(verification_result)
 
@@ -307,9 +216,9 @@ class FaceVerificationView(APIView):
                     pass
 
         except Exception as e:
-            logger.error(f"Verification process failed: {str(e)}")
+            logger.error(f"Verification process failed......: {str(e)}")
             return Response(
-                {"error": f"Verification process failed: {str(e)}"},
+                {"error": f"Verification process failed !!!!: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
