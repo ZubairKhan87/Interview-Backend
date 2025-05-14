@@ -405,11 +405,12 @@ class ConfidencePredictor:
             try:
                 # Make prediction using the Hugging Face model
                 result = self.client.predict(
-                    image=temp_path,      # Just pass the path directly
+                    # image=temp_path,
+                    image=handle_file(temp_path),
                     api_name="/predict"
                 )
 
-                
+                print("result with handle.....",result)
                 
                 # Process the result based on  model's output format
                 if isinstance(result, str):

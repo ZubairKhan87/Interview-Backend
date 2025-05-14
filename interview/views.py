@@ -729,6 +729,9 @@ def confidence_prediction(candidate_id, job_id):
             json=confidence_data,
         )
 
+        print("response final...", response)
+
+
         if response.status_code == 200:
             result = response.json()
             print(f"Confidence prediction response: {result}")
