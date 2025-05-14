@@ -52,13 +52,12 @@ class FaceVerificationView(APIView):
         try:
             # Check if it's a Cloudinary/external URL
             if image_url.startswith('http'):
-                print("inside image_url condition",image_url)
                 temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp')
                 os.makedirs(temp_dir, exist_ok=True)
 
                 filename = f"cloud_{uuid.uuid4().hex}.jpg"
                 file_path = os.path.join(temp_dir, filename)
-                print("file_path",file_path)
+                
                 # Download the image
                 response = requests.get(image_url)
                 if response.status_code != 200:
@@ -66,7 +65,6 @@ class FaceVerificationView(APIView):
                 
                 with open(file_path, 'wb') as f:
                     f.write(response.content)
-                print("file_path at return",file_path)
                 return file_path
 
             # Handle local media path
@@ -83,8 +81,6 @@ class FaceVerificationView(APIView):
         except Exception as e:
             logger.error("Error processing image path: %s", str(e))
             raise ValueError(f"Error processing image path: {str(e)}")
-
-    
 
     def preprocess_image(self, image_path):
         """Preprocess image for consistent size and format using Pillow."""
@@ -105,28 +101,6 @@ class FaceVerificationView(APIView):
             logger.error(f"Image preprocessing error: {str(e)}")
             raise ValueError(f"Image preprocessing failed: {str(e)}")
 
-
-    # def validate_frame(self, frame):
-    #     """Checks if the frame contains exactly one face."""
-    #     try:
-    #         # Detect faces
-    #         faces = self.detector.detect_faces(frame)
-            
-    #         if len(faces) == 0:
-    #             return {"error": "No face detected. Please ensure your face is clearly visible."}
-    #         elif len(faces) > 1:
-    #             return {"error": "Multiple faces detected. Please ensure only your face is in the frame."}
-            
-    #         face = faces[0]
-    #         if face['confidence'] < 0.85:
-    #             return {"error": "Face not clear enough. Please ensure good lighting and look directly at the camera."}
-
-    #         return {"valid": True}
-    #     except Exception as e:
-    #         logger.error(f"Face validation error: {str(e)}")
-    #         return {"error": f"Face validation failed: {str(e)}"}
-
-
     def verify_faces(self, ref_img_path, target_img_path): 
         """Verifies whether the faces in two images belong to the same person using deployed HF API."""
         try:
@@ -138,32 +112,41 @@ class FaceVerificationView(APIView):
             temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp')
             os.makedirs(temp_dir, exist_ok=True)
 
-            temp_ref_path = os.path.join(temp_dir, 'temp_ref.jpg')
-            temp_target_path = os.path.join(temp_dir, 'temp_target.jpg')
+            temp_ref_path = os.path.join(temp_dir, f'temp_ref_{uuid.uuid4().hex}.jpg')
+            temp_target_path = os.path.join(temp_dir, f'temp_target_{uuid.uuid4().hex}.jpg')
 
-            # Save temp_ref_path
+            # Save temp files
             Image.fromarray(ref_img).save(temp_ref_path, format="JPEG", quality=95)
-
-            # Save temp_target_path
             Image.fromarray(target_img).save(temp_target_path, format="JPEG", quality=95)
             
             try:
+                # Initialize client with explicit API token
+                hf_token = os.getenv("HF_API_TOKEN")
+                if not hf_token:
+                    logger.error("HF_API_TOKEN not found in environment variables")
+                    return {"error": "API configuration error. Please contact support."}
+                
+                # Create client with proper authentication
                 client = Client(
                     "bairi56/face-verification",
-                    hf_token=os.getenv("HF_API_TOKEN"),
+                    hf_token=hf_token,
                 )
-                print("client",client)
-                print("HF_API_TOKEN",os.getenv("HF_API_TOKEN"))
-
-                # Send images to Hugging Face API
+                
+                logger.info(f"Sending verification request to API")
+                
+                # Send images using handle_file to properly format them for the API
                 result = client.predict(
-                    temp_ref_path,  # Changed to use temporary files
-                    temp_target_path,
+                    img1=handle_file(temp_ref_path),
+                    img2=handle_file(temp_target_path),
                     api_name="/predict"
                 )
                 
                 # Log the raw response for debugging
                 logger.info(f"Raw API response: {result}")
+
+                # Check if result is None or empty
+                if not result:
+                    return {"error": "Empty response from verification API"}
 
                 # Parse result properly as a string
                 if isinstance(result, str):
@@ -172,7 +155,6 @@ class FaceVerificationView(APIView):
                         similarity = None
                         try:
                             # Look for "Similarity Score: X.XXXX" pattern
-                            import re
                             match = re.search(r"Similarity Score: (\d+\.\d+)", result)
                             if match:
                                 similarity = float(match.group(1))
@@ -194,13 +176,18 @@ class FaceVerificationView(APIView):
                     elif "Face not clear enough" in result:
                         return {"error": "Face not clear enough. Please ensure good lighting and look directly at the camera."}
                     else:
-                        # Return a more specific error based on the actual response
-                        return {"error": f"Verification failed: {result}", "raw_response": result}
+                        # No match but valid response
+                        return {
+                            "match": False,
+                            "raw_response": result  # Include raw response for debugging
+                        }
                 else:
-                    return {"error": "Unexpected response format from verification model."}
+                    return {"error": f"Unexpected response format from verification model: {type(result)}"}
                     
             except Exception as e:
                 logger.error(f"Verification error: {str(e)}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
                 return {"error": f"Verification failed: {str(e)}"}
 
             finally:
@@ -216,12 +203,10 @@ class FaceVerificationView(APIView):
             logger.error(f"Verification error: {str(e)}")
             return {"error": f"Verification failed: {str(e)}"}
 
-
     def post(self, request):
         try:
             # Get and validate reference image
             ref_image = request.FILES.get('ref_image')
-            print("ref_image",ref_image)
             if not ref_image:
                 return Response(
                     {"error": "No reference image provided"},
@@ -230,7 +215,6 @@ class FaceVerificationView(APIView):
 
             # Get and validate target image path
             target_image = request.data.get('target_image')
-            print("target_image",target_image)
             if not target_image or target_image == 'null':
                 return Response(
                     {"error": "No profile image found. Please upload your profile image first."},
@@ -249,19 +233,13 @@ class FaceVerificationView(APIView):
             temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp')
             os.makedirs(temp_dir, exist_ok=True)
 
-            # Save reference image
-            ref_image_path = os.path.join(temp_dir, f'ref_{request.user.id}_{ref_image.name}')
+            # Save reference image with unique name
+            ref_image_path = os.path.join(temp_dir, f'ref_{request.user.id}_{uuid.uuid4().hex}_{ref_image.name}')
             with open(ref_image_path, 'wb+') as destination:
                 for chunk in ref_image.chunks():
                     destination.write(chunk)
 
             try:
-                # Preprocess and validate reference image
-                ref_img = self.preprocess_image(ref_image_path)
-                # validation_result = self.validate_frame(ref_img)
-                # if "error" in validation_result:
-                #     return Response(validation_result, status=status.HTTP_400_BAD_REQUEST)
-
                 # Verify faces
                 verification_result = self.verify_faces(ref_image_path, target_image_path)
                 if "error" in verification_result:
