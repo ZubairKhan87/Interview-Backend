@@ -120,8 +120,9 @@ class FaceVerificationView(APIView):
             Image.fromarray(target_img).save(temp_target_path, format="JPEG", quality=95)
             
             try:
-                # APPROACH: Use your direct test approach that works
-                # Hardcode the token like in your test code (not ideal for production but for debugging)
+                # APPROACH: Use direct HTTP requests instead of gradio_client
+                # This is a fallback method since gradio_client is returning HTML instead of JSON
+                
                 hf_token = os.getenv("HF_API_TOKEN")
                 if not hf_token:
                     logger.error("HF_API_TOKEN not found in environment variables")
@@ -129,35 +130,54 @@ class FaceVerificationView(APIView):
                     hf_token = "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"  # This is from your test code
                     logger.warning("Using fallback token for testing. Remove in production.")
                 
-                logger.info(f"Creating client using direct approach that worked in test...")
+                logger.info("Using direct HTTP requests instead of gradio_client")
                 
-                # Use the direct class instantiation without error handling for now
-                from gradio_client import Client
-                client = Client(
-                    "bairi56/face-verification",
-                    hf_token=hf_token
-                )
+                # Direct API access using requests
+                import requests
                 
-                logger.info(f"Client created successfully")
-                logger.info(f"Sending verification request to API")
+                # Define API URL - using the endpoint that worked in your direct check
+                api_url = "https://bairi56-face-verification.hf.space/run/predict"
                 
-                # Send images using handle_file to properly format them for the API
-                # Make the API call directly like in your test function
-                result = client.predict(
-                    img1=handle_file(temp_ref_path),
-                    img2=handle_file(temp_target_path),
-                    api_name="/predict"
-                )
+                # Prepare files for multipart upload
+                files = {
+                    'img1': ('ref_image.jpg', open(temp_ref_path, 'rb'), 'image/jpeg'),
+                    'img2': ('target_image.jpg', open(temp_target_path, 'rb'), 'image/jpeg')
+                }
                 
-                # Log the raw response for debugging
-                logger.info(f"Raw API response: {result}")
-                logger.info(f"Response type: {type(result)}")
-
-                # Check if result is None or empty
-                if not result:
-                    return {"error": "Empty response from verification API"}
-
-                # Parse result properly as a string
+                # Prepare headers with authentication
+                headers = {
+                    'Authorization': f'Bearer {hf_token}'
+                }
+                
+                # Make the API request
+                logger.info(f"Sending direct HTTP request to {api_url}")
+                response = requests.post(api_url, files=files, headers=headers)
+                
+                # Check response status
+                logger.info(f"API response status: {response.status_code}")
+                logger.info(f"API response headers: {response.headers}")
+                
+                # Try to parse the response
+                if response.status_code == 200:
+                    try:
+                        # Try JSON first
+                        result_data = response.json()
+                        logger.info(f"Received JSON response: {result_data}")
+                        
+                        # Extract the result (structure depends on API)
+                        result = result_data.get('data', '')
+                        if isinstance(result, list) and len(result) > 0:
+                            result = result[0]  # Common format for HF API responses
+                            
+                    except Exception as json_err:
+                        # Fall back to text response
+                        logger.warning(f"JSON parsing failed: {str(json_err)}")
+                        result = response.text
+                        logger.info(f"Using text response: {result[:200]}...")  # Log first 200 chars
+                else:
+                    return {"error": f"API request failed with status code: {response.status_code}"}
+                
+                # Process the result
                 if isinstance(result, str):
                     if "Match: Yes" in result or "Match ✅" in result:
                         # Extract similarity score
@@ -191,29 +211,35 @@ class FaceVerificationView(APIView):
                             "raw_response": result  # Include raw response for debugging
                         }
                 else:
-                    return {"error": f"Unexpected response format from verification model: {type(result)}"}
+                    # Attempt to extract information from other response formats
+                    logger.info(f"Processing non-string result: {type(result)}")
+                    logger.info(f"Result content: {result}")
+                    
+                    # Try to determine if there's a match based on the response structure
+                    # This will depend on the actual response format of your API
+                    match_found = False
+                    confidence = None
+                    
+                    # Add logic here to extract match information from the response
+                    # (This is placeholder logic and should be adjusted based on actual response)
+                    if isinstance(result, dict):
+                        if result.get('match') is not None:
+                            match_found = result.get('match')
+                        if result.get('confidence') is not None:
+                            confidence = result.get('confidence')
+                        if result.get('similarity') is not None:
+                            confidence = float(result.get('similarity')) * 100
+                    
+                    return {
+                        "match": match_found,
+                        "confidence": confidence,
+                        "raw_response": str(result)  # Convert to string for safe logging
+                    }
                     
             except Exception as e:
                 logger.error(f"Verification error: {str(e)}")
                 import traceback
                 logger.error(f"Traceback: {traceback.format_exc()}")
-                
-                # Add specific checks for common errors
-                error_msg = str(e)
-                if "Expecting value: line 1 column 1" in error_msg:
-                    logger.error("JSON decode error detected - likely receiving non-JSON response from API")
-                    # Try to log the raw response if possible
-                    try:
-                        # Let's try a direct request to check API status
-                        import requests
-                        api_check_url = "https://bairi56-face-verification.hf.space/run/predict"
-                        logger.info(f"Checking API directly with requests: {api_check_url}")
-                        check_response = requests.get(api_check_url)
-                        logger.info(f"Direct API check status: {check_response.status_code}")
-                        logger.info(f"Direct API response: {check_response.text[:500]}")  # Log first 500 chars
-                    except Exception as check_error:
-                        logger.error(f"API check error: {str(check_error)}")
-                
                 return {"error": f"Verification failed: {str(e)}"}
 
             finally:
