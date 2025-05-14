@@ -377,25 +377,30 @@ class FaceVerificationCheat(APIView):
 
 
 
+import time
 
 
 # confidence_prediction/views.py
 class ConfidencePredictor:
     def __init__(self):
-        # Initialize the Hugging Face client
-        self.api_token =os.getenv("HF_API_TOKEN")
+        # Load the Hugging Face API token from environment variable
+        self.api_token = os.getenv("HF_API_TOKEN")
+        if not self.api_token:
+            raise ValueError("HF_API_TOKEN is not set in environment variables.")
+
+        # Initialize the Hugging Face Gradio Client
         self.client = Client(
             "bairi56/confidence-measure-model",
             hf_token=self.api_token
         )
-
+        print("client",self.client)
     def process_image_url(self, image_url):
         try:
             # Download image from URL
             response = requests.get(image_url)
             if response.status_code != 200:
-                print(f"Failed to download image: {response.status_code}")
-                return None
+                print(f"[❌] Failed to download image. Status code: {response.status_code}")
+                return {"error": f"Image download failed with status {response.status_code}"}
 
             # Create a temporary file to store the image
             with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
@@ -404,14 +409,21 @@ class ConfidencePredictor:
 
             try:
                 # Make prediction using the Hugging Face model
-                result = self.client.predict(
-                    # image=temp_path,
-                    image=handle_file(temp_path),
-                    api_name="/predict"
-                )
+               for attempt in range(3):
+                try:
+                    print(f"[🔄] Attempt {attempt + 1} to call model...")
+                    result = self.client.predict(
+                        image=handle_file(temp_path),
+                        api_name="/predict"
+                    )
+                    print("[✅] Prediction succeeded:", result)
+                    return result
+                except Exception as e:
+                    print(f"[⚠️] Attempt {attempt + 1} failed with error: {e}")
+                    time.sleep(2)
 
                 print("result with handle.....",result)
-                
+                print("[❌] All prediction attempts failed.")
                 # Process the result based on  model's output format
                 if isinstance(result, str):
                     # Try to extract the confidence value from the string using regex
