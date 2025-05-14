@@ -13,7 +13,7 @@ import os
 import requests
 from io import BytesIO
 import threading
-from gradio_client import Client
+from gradio_client import Client, handle_file
 import tempfile
 import re
 import cloudinary
