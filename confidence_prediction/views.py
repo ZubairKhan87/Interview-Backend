@@ -23,7 +23,6 @@ import re
 from PIL import Image, ImageOps
 import numpy as np
 logger = logging.getLogger(__name__)
-from huggingface_hub import InferenceClient
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -149,40 +148,45 @@ class FaceVerificationView(APIView):
             Image.fromarray(target_img).save(temp_target_path, format="JPEG", quality=95)
             
             try:
-                # Import the appropriate client
-                
-                # Create the client with proper authentication
-                client = InferenceClient(
-                    model="bairi56/face-verification",
-                    token=os.getenv("HF_API_TOKEN")  # Make sure this environment variable is set
+                client = Client(
+                    "bairi56/face-verification",
+                    hf_token=os.getenv("HF_API_TOKEN"),
                 )
+                print("client",client)
+                print("HF_API_TOKEN",os.getenv("HF_API_TOKEN"))
 
-                # Open files for binary sending
-                with open(temp_ref_path, "rb") as ref_file, open(temp_target_path, "rb") as target_file:
-                    # Send images to Hugging Face API using the appropriate method
-                    result = client.post(
-                        json={},  # Empty JSON data
-                        data={
-                            "ref_img": ref_file,
-                            "target_img": target_file
-                        },
-                        model="bairi56/face-verification"
-                    )
+                # Send images to Hugging Face API
+                result = client.predict(
+                    temp_ref_path,  # Changed to use temporary files
+                    temp_target_path,
+                    api_name="/predict"
+                )
+                
+                # Log the raw response for debugging
+                logger.info(f"Raw API response: {result}")
 
-                # Parse result - check if it's a string, dict, or other format
+                # Parse result properly as a string
                 if isinstance(result, str):
-                    if "Match ✅" in result:
-                        # Extract similarity percentage
+                    if "Match: Yes" in result or "Match ✅" in result:
+                        # Extract similarity score
                         similarity = None
                         try:
-                            similarity = float(result.split("Similarity:")[1].strip().replace("%", ""))
-                        except:
-                            pass
-
+                            # Look for "Similarity Score: X.XXXX" pattern
+                            import re
+                            match = re.search(r"Similarity Score: (\d+\.\d+)", result)
+                            if match:
+                                similarity = float(match.group(1))
+                        except Exception as e:
+                            logger.warning(f"Failed to extract similarity score: {str(e)}")
+                            
                         return {
                             "match": True,
-                            "confidence": round(similarity, 2) if similarity else None
+                            "confidence": round(similarity * 100, 2) if similarity else None,
+                            "raw_response": result  # Include raw response for debugging
                         }
+                        
+                    elif "too dark or unclear" in result:
+                        return {"error": "Face in Target Image is too dark or unclear. Ensure good lighting and look directly at the camera."}
                     elif "No face detected" in result:
                         return {"error": "No face detected. Please ensure your face is clearly visible."}
                     elif "Multiple faces detected" in result:
@@ -190,15 +194,10 @@ class FaceVerificationView(APIView):
                     elif "Face not clear enough" in result:
                         return {"error": "Face not clear enough. Please ensure good lighting and look directly at the camera."}
                     else:
-                        return {"error": result}  # fallback unknown string
-                elif isinstance(result, dict):
-                    # Handle dictionary response
-                    if "match" in result:
-                        return result
-                    else:
-                        return {"error": "Unexpected response format from verification model."}
+                        # Return a more specific error based on the actual response
+                        return {"error": f"Verification failed: {result}", "raw_response": result}
                 else:
-                    return {"error": f"Unexpected response type from verification model: {type(result)}"}
+                    return {"error": "Unexpected response format from verification model."}
                     
             except Exception as e:
                 logger.error(f"Verification error: {str(e)}")
@@ -216,6 +215,7 @@ class FaceVerificationView(APIView):
         except Exception as e:
             logger.error(f"Verification error: {str(e)}")
             return {"error": f"Verification failed: {str(e)}"}
+
 
     def post(self, request):
         try:
