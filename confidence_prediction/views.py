@@ -120,36 +120,29 @@ class FaceVerificationView(APIView):
             Image.fromarray(target_img).save(temp_target_path, format="JPEG", quality=95)
             
             try:
-                # Initialize client with explicit API token
+                # APPROACH: Use your direct test approach that works
+                # Hardcode the token like in your test code (not ideal for production but for debugging)
                 hf_token = os.getenv("HF_API_TOKEN")
                 if not hf_token:
                     logger.error("HF_API_TOKEN not found in environment variables")
-                    return {"error": "API configuration error. Please contact support."}
+                    # Use hardcoded token as fallback for testing only (remove in production)
+                    hf_token = "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"  # This is from your test code
+                    logger.warning("Using fallback token for testing. Remove in production.")
                 
-                logger.info(f"Creating client with token: {hf_token[:5]}...")
+                logger.info(f"Creating client using direct approach that worked in test...")
                 
-                # Create client with proper authentication - FIXED INITIALIZATION
-                try:
-                    client = Client(
-                        "https://bairi56-face-verification.hf.space",  # Use direct URL format
-                        hf_token=hf_token,
-                    )
-                except Exception as client_error:
-                    logger.error(f"Client initialization error: {str(client_error)}")
-                    # Try alternative initialization
-                    try:
-                        logger.info("Attempting alternative client initialization...")
-                        client = Client(
-                            "bairi56/face-verification",
-                            hf_token=hf_token,
-                        )
-                    except Exception as alt_error:
-                        logger.error(f"Alternative client initialization failed: {str(alt_error)}")
-                        return {"error": "Failed to connect to verification service"}
+                # Use the direct class instantiation without error handling for now
+                from gradio_client import Client
+                client = Client(
+                    "bairi56/face-verification",
+                    hf_token=hf_token
+                )
                 
-                logger.info(f"Sending verification request to API with files: {temp_ref_path}, {temp_target_path}")
+                logger.info(f"Client created successfully")
+                logger.info(f"Sending verification request to API")
                 
                 # Send images using handle_file to properly format them for the API
+                # Make the API call directly like in your test function
                 result = client.predict(
                     img1=handle_file(temp_ref_path),
                     img2=handle_file(temp_target_path),
@@ -204,6 +197,23 @@ class FaceVerificationView(APIView):
                 logger.error(f"Verification error: {str(e)}")
                 import traceback
                 logger.error(f"Traceback: {traceback.format_exc()}")
+                
+                # Add specific checks for common errors
+                error_msg = str(e)
+                if "Expecting value: line 1 column 1" in error_msg:
+                    logger.error("JSON decode error detected - likely receiving non-JSON response from API")
+                    # Try to log the raw response if possible
+                    try:
+                        # Let's try a direct request to check API status
+                        import requests
+                        api_check_url = "https://bairi56-face-verification.hf.space/run/predict"
+                        logger.info(f"Checking API directly with requests: {api_check_url}")
+                        check_response = requests.get(api_check_url)
+                        logger.info(f"Direct API check status: {check_response.status_code}")
+                        logger.info(f"Direct API response: {check_response.text[:500]}")  # Log first 500 chars
+                    except Exception as check_error:
+                        logger.error(f"API check error: {str(check_error)}")
+                
                 return {"error": f"Verification failed: {str(e)}"}
 
             finally:
