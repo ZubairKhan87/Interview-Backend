@@ -157,8 +157,8 @@ class FaceVerificationView(APIView):
 
                 # Send images to Hugging Face API
                 result = client.predict(
-                    temp_ref_path,  # Changed to use temporary files
-                    temp_target_path,
+                    data={"reference": ref_img_path, "target": target_img_path},
+
                     api_name="/predict"
                 )
                 
