@@ -94,7 +94,7 @@ class FaceVerificationView(APIView):
 
             # Convert to NumPy array
             img_array = np.array(img_resized)
-
+            print("img_array",img_array)
             return img_array
 
         except Exception as e:
@@ -112,7 +112,8 @@ class FaceVerificationView(APIView):
             # Preprocess images
             ref_img = self.preprocess_image(ref_img_path)
             target_img = self.preprocess_image(target_img_path)
-
+            print("ref_img",ref_img)
+            print("target_img",target_img)
             # Save images temporarily
             temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp')
             os.makedirs(temp_dir, exist_ok=True)
@@ -125,20 +126,21 @@ class FaceVerificationView(APIView):
 
             # Initialize Gradio client
             client = Client("bairi56/face-verification", hf_token=hf_token)
-
+            print("client",client)
             # Send API request
             result = client.predict(
                 img1=handle_file(ref_temp),
                 img2=handle_file(target_temp),
                 api_name="/predict"
             )
-
-            logger.info(f"HF API Result: {result}")
+            print("result",result)
+            logger.error(f"HF API Result: {result}")
 
             if isinstance(result, str):
+
                 match = re.search(r"Similarity Score: (\d+\.\d+)", result)
                 similarity = float(match.group(1)) if match else None
-
+                print("similarity",similarity)
                 return {
                     "match": "Match: Yes" in result or "✅" in result,
                     "confidence": round(similarity * 100, 2) if similarity else None,
@@ -201,6 +203,7 @@ class FaceVerificationView(APIView):
             try:
                 # Verify faces
                 verification_result = self.verify_faces(ref_image_path, target_image_path)
+                print("verification_result",verification_result)
                 logger.info(f"Verification Result: {verification_result}")
                 if "error" in verification_result:
                     return Response("error in verification",verification_result, status=status.HTTP_400_BAD_REQUEST)
