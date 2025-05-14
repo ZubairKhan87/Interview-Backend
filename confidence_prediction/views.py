@@ -218,64 +218,64 @@ class FaceVerificationView(APIView):
         except Exception as e:
             logger.error(f"Verification error: {str(e)}")
             return {"error": f"Verification failed: {str(e)}"}
-        def post(self, request):
-            try:
-                # Get and validate reference image
-                ref_image = request.FILES.get('ref_image')
-                if not ref_image:
-                    return Response(
-                        {"error": "No reference image provided"},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-
-                # Get and validate target image path
-                target_image = request.data.get('target_image')
-                if not target_image or target_image == 'null':
-                    return Response(
-                        {"error": "No profile image found. Please upload your profile image first."},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-
-                try:
-                    target_image_path = self.get_image_path(target_image)
-                except ValueError as e:
-                    return Response(
-                        {"error": str(e)},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-
-                # Create temp directory if it doesn't exist
-                temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp')
-                os.makedirs(temp_dir, exist_ok=True)
-
-                # Save reference image with unique name
-                ref_image_path = os.path.join(temp_dir, f'ref_{request.user.id}_{uuid.uuid4().hex}_{ref_image.name}')
-                with open(ref_image_path, 'wb+') as destination:
-                    for chunk in ref_image.chunks():
-                        destination.write(chunk)
-
-                try:
-                    # Verify faces
-                    verification_result = self.verify_faces(ref_image_path, target_image_path)
-                    if "error" in verification_result:
-                        return Response(verification_result, status=status.HTTP_400_BAD_REQUEST)
-
-                    return Response(verification_result)
-
-                finally:
-                    # Clean up reference image
-                    try:
-                        if os.path.exists(ref_image_path):
-                            os.remove(ref_image_path)
-                    except Exception:
-                        pass
-
-            except Exception as e:
-                logger.error(f"Verification process failed: {str(e)}")
+    def post(self, request):
+        try:
+            # Get and validate reference image
+            ref_image = request.FILES.get('ref_image')
+            if not ref_image:
                 return Response(
-                    {"error": f"Verification process failed: {str(e)}"},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    {"error": "No reference image provided"},
+                    status=status.HTTP_400_BAD_REQUEST
                 )
+
+            # Get and validate target image path
+            target_image = request.data.get('target_image')
+            if not target_image or target_image == 'null':
+                return Response(
+                    {"error": "No profile image found. Please upload your profile image first."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            try:
+                target_image_path = self.get_image_path(target_image)
+            except ValueError as e:
+                return Response(
+                    {"error": str(e)},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Create temp directory if it doesn't exist
+            temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp')
+            os.makedirs(temp_dir, exist_ok=True)
+
+            # Save reference image with unique name
+            ref_image_path = os.path.join(temp_dir, f'ref_{request.user.id}_{uuid.uuid4().hex}_{ref_image.name}')
+            with open(ref_image_path, 'wb+') as destination:
+                for chunk in ref_image.chunks():
+                    destination.write(chunk)
+
+            try:
+                # Verify faces
+                verification_result = self.verify_faces(ref_image_path, target_image_path)
+                if "error" in verification_result:
+                    return Response(verification_result, status=status.HTTP_400_BAD_REQUEST)
+
+                return Response(verification_result)
+
+            finally:
+                # Clean up reference image
+                try:
+                    if os.path.exists(ref_image_path):
+                        os.remove(ref_image_path)
+                except Exception:
+                    pass
+
+        except Exception as e:
+            logger.error(f"Verification process failed: {str(e)}")
+            return Response(
+                {"error": f"Verification process failed: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 from rest_framework.permissions import IsAuthenticated,AllowAny
