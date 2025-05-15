@@ -697,44 +697,41 @@ def confidence_prediction(candidate_id, job_id):
         if not interview_details:
             print("No interview details found")
             return None
-
+            
         # Check if frames exist
         frames = interview_details.get('interview_frames', [])
         if not frames:
             print("No frames found in interview details")
             return None
-        
-        print("Base URL", settings.BASE_URL)
 
-        confidence_url = f"{settings.BASE_URL.rstrip('/')}/api/confidence_prediction/analyze-confidence/"
-        # Extract full URL from CloudinaryResource or string
+        confidence_url = f"{settings.BASE_URL}/api/confidence_prediction/analyze-confidence/"
+        
+        # Construct full URLs for frames
+        domain = settings.BASE_URL.rstrip('/')  # Remove trailing slash if present
         frame_data = []
         for frame in frames:
-            url = frame.get("url")
-            if hasattr(url, "url"):
-                url = url.url  # CloudinaryResource
-            frame_data.append({"url": url})
-
+            # Get relative URL and ensure it starts with a single forward slash
+            relative_url = frame["url"].lstrip('/')
+            full_url = f"{domain}/{relative_url}"
+            frame_data.append({"url": full_url})
+        
         # Prepare data
         confidence_data = {
             "frames": frame_data
         }
-
-        print("confidence_data", confidence_data)
-
+        
         print(f"Sending request with frame URLs:")
         # for frame in frame_data:
         #     print(f"Frame URL: {frame['url']}")
-
+        
         # Call confidence prediction endpoint
         response = requests.post(
             confidence_url,
             json=confidence_data,
         )
-
-        print("response final...", response)
-        print("json response", response.json())
-
+        
+        # print(f"Confidence prediction response status: {response.status_code}")
+        
         if response.status_code == 200:
             result = response.json()
             print(f"Confidence prediction response: {result}")
@@ -743,10 +740,11 @@ def confidence_prediction(candidate_id, job_id):
             print(f"Confidence prediction failed with status {response.status_code}")
             print(f"Response content: {response.text}")
             return None
-
+        
     except Exception as e:
         print(f"Error in confidence prediction: {str(e)}")
         return None
+
 
 
 

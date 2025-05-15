@@ -384,7 +384,7 @@ import time
 class ConfidencePredictor:
     def __init__(self):
         # Initialize the Hugging Face client
-        self.api_token =os.getenv("HF_API_TOKEN")
+        self.api_token = os.getenv("HF_API_TOKEN")
         self.client = Client(
             "bairi56/confidence-measure-model",
             hf_token=self.api_token
@@ -393,9 +393,7 @@ class ConfidencePredictor:
     def process_image_url(self, image_url):
         try:
             # Download image from URL
-            print("image_url",image_url)
             response = requests.get(image_url)
-            print("response of receing image..",response)
             if response.status_code != 200:
                 print(f"Failed to download image: {response.status_code}")
                 return None
@@ -405,41 +403,40 @@ class ConfidencePredictor:
                 temp_file.write(response.content)
                 temp_path = temp_file.name
 
-                try:
-                    # Make prediction using the Hugging Face model
-                    result = self.client.predict(
-                        # image=temp_path,
-                        image=temp_path,
-                        api_name="/predict"
-                    )
-
-                    print("result with handle.....",result)
-                    # Process the result based on  model's output format
-                    if isinstance(result, str):
-                        # Try to extract the confidence value from the string using regex
-                        match = re.search(r"Confidence:\s*([\d.]+)%", result)
-                        if match:
-                            confidence_percentage = float(match.group(1))
-                            return round(confidence_percentage, 2)
-                        else:
-                            print(f"Could not extract confidence value from: {result}")
-                            return None
-
-                    elif isinstance(result, (list, tuple)) and len(result) > 0:
-                        confidence_value = result[0]
-                        if isinstance(confidence_value, (int, float)):
-                            if 0 <= confidence_value <= 1:
-                                return round(confidence_value * 100, 2)
-                            return round(confidence_value, 2)
+            try:
+                # Make prediction using the Hugging Face model
+                result = self.client.predict(
+                    image=handle_file(temp_path),
+                    api_name="/predict"
+                )
+                
+                
+                # Process the result based on  model's output format
+                if isinstance(result, str):
+                    # Try to extract the confidence value from the string using regex
+                    match = re.search(r"Confidence:\s*([\d.]+)%", result)
+                    if match:
+                        confidence_percentage = float(match.group(1))
+                        return round(confidence_percentage, 2)
                     else:
-                        print(f"Unexpected result format: {result}")
+                        print(f"Could not extract confidence value from: {result}")
                         return None
+
+                elif isinstance(result, (list, tuple)) and len(result) > 0:
+                    confidence_value = result[0]
+                    if isinstance(confidence_value, (int, float)):
+                        if 0 <= confidence_value <= 1:
+                            return round(confidence_value * 100, 2)
+                        return round(confidence_value, 2)
+                else:
+                    print(f"Unexpected result format: {result}")
+                    return None
+                
+            finally:
+                # Clean up the temporary file
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
                     
-                finally:
-                    # Clean up the temporary file
-                    if os.path.exists(temp_path):
-                        os.unlink(temp_path)
-                        
         except Exception as e:
             print(f"Error processing image: {e}")
             return None
@@ -455,12 +452,10 @@ def analyze_confidence(request):
 
         # Use the new HuggingFace-based predictor
         predictor = ConfidencePredictor()
-        print("predictor",predictor)
         confidence_scores = []
         
         # Process each frame
         for frame in frames:
-            print("frame are passing to model ..",frame)
             frame_url = frame.get('url')
             score = predictor.process_image_url(frame_url)
             if score is not None:
