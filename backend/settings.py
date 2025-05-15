@@ -33,7 +33,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-secret-key')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 PORT = os.environ.get('PORT', '8000')
-BASE_URL='interview-backend-production-bdf0.up.railway.app',
+BASE_URL='https://interview-backend-production-bdf0.up.railway.app', 
 ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
