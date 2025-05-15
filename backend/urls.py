@@ -32,7 +32,7 @@ urlpatterns = [
     path('api/authentication/', include('authentication.urls')),  # Add this line
     path('api/job_posting/', include('job_posting.urls')),
     path('api/chat/', include('interview.urls')),  # Include URLs from the chatbot app
-    path('api/confidence_prediction/', include('confidence_prediction.urls')),  # Add this line
+    # path('api/confidence_prediction/', include('confidence_prediction.urls')),  # Add this line
     path('auth/', include('social_django.urls', namespace='social')),  # Adds Google OAuth endpoints
     
     path('', health_check, name='health_check'),

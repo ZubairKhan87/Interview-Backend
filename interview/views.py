@@ -719,6 +719,8 @@ def confidence_prediction(candidate_id, job_id):
             "frames": frame_data
         }
 
+        print("confidence_data", confidence_data)
+
         print(f"Sending request with frame URLs:")
         # for frame in frame_data:
         #     print(f"Frame URL: {frame['url']}")
@@ -730,7 +732,7 @@ def confidence_prediction(candidate_id, job_id):
         )
 
         print("response final...", response)
-
+        print("json response", response.json())
 
         if response.status_code == 200:
             result = response.json()

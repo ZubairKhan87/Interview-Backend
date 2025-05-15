@@ -385,6 +385,7 @@ class ConfidencePredictor:
     def __init__(self):
         # Load the Hugging Face API token from environment variable
         self.api_token = os.getenv("HF_API_TOKEN")
+        print("api_token",self.api_token)
         if not self.api_token:
             raise ValueError("HF_API_TOKEN is not set in environment variables.")
 
@@ -465,10 +466,12 @@ def analyze_confidence(request):
 
         # Use the new HuggingFace-based predictor
         predictor = ConfidencePredictor()
+        print("predictor",predictor)
         confidence_scores = []
         
         # Process each frame
         for frame in frames:
+            print("frame are passing to model ..",frame)
             frame_url = frame.get('url')
             score = predictor.process_image_url(frame_url)
             if score is not None:
