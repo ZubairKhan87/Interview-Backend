@@ -729,6 +729,8 @@ def confidence_prediction(candidate_id, job_id):
             confidence_url,
             json=confidence_data,
         )
+        print("Raw prediction response:", response)
+
         
         # print(f"Confidence prediction response status: {response.status_code}")
         

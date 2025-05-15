@@ -384,12 +384,12 @@ import traceback
 class ConfidencePredictor:
     def __init__(self):
         # Initialize the Hugging Face client
-        self.api_token = os.getenv("HF_API_TOKEN")
-        print("Loaded HF API Token:", self.api_token is not None)
+        # self.api_token = os.getenv("HF_API_TOKEN")
+        # print("Loaded HF API Token:", self.api_token is not None)
 
         self.client = Client(
             "https://bairi56-confidence-measure-model.hf.space/",
-            hf_token=self.api_token
+            "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"
         )
         print("Client initialized:", self.client is not None)
 
@@ -397,6 +397,7 @@ class ConfidencePredictor:
         try:
             # Download image from URL
             response = requests.get(image_url)
+            print("response image....",response)
             if response.status_code != 200:
                 print(f"Failed to download image: {response.status_code}")
                 return None
@@ -405,8 +406,10 @@ class ConfidencePredictor:
             with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
                 temp_file.write(response.content)
                 temp_path = temp_file.name
-
+                print("temp_path",temp_path)
             try:
+                print("we are in try statement")
+
                 # Make prediction using the Hugging Face model
                 result = self.client.predict(
                     image=handle_file(temp_path),
