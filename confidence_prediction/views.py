@@ -379,16 +379,19 @@ class FaceVerificationCheat(APIView):
 
 import time
 
-
+import traceback
 # confidence_prediction/views.py
 class ConfidencePredictor:
     def __init__(self):
         # Initialize the Hugging Face client
         self.api_token = os.getenv("HF_API_TOKEN")
+        print("Loaded HF API Token:", self.api_token is not None)
+
         self.client = Client(
-            "bairi56/confidence-measure-model",
+            "https://bairi56-confidence-measure-model.hf.space/",
             hf_token=self.api_token
         )
+        print("Client initialized:", self.client is not None)
 
     def process_image_url(self, image_url):
         try:
@@ -409,7 +412,8 @@ class ConfidencePredictor:
                     image=handle_file(temp_path),
                     api_name="/predict"
                 )
-                
+                print(f"Raw model output: {result}")
+
                 
                 # Process the result based on  model's output format
                 if isinstance(result, str):
@@ -439,6 +443,8 @@ class ConfidencePredictor:
                     
         except Exception as e:
             print(f"Error processing image: {e}")
+            traceback.print_exc()  # Add this to show full error trace
+
             return None
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
