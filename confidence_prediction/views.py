@@ -378,6 +378,7 @@ class FaceVerificationCheat(APIView):
 
 
 import time
+import mimetypes
 
 import traceback
 # confidence_prediction/views.py
@@ -394,62 +395,63 @@ class ConfidencePredictor:
         )
         print("Client initialized:", self.client is not None)
 
+
     def process_image_url(self, image_url):
         try:
-            # Download image from URL
             response = requests.get(image_url)
-            print("response image....",response)
             if response.status_code != 200:
                 print(f"Failed to download image: {response.status_code}")
                 return None
 
-            # Create a temporary file to store the image
             with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
                 temp_file.write(response.content)
                 temp_path = temp_file.name
-                print("temp_path",temp_path)
+
             try:
-                print("we are in try statement")
+                mime_type, _ = mimetypes.guess_type(temp_path)
 
-                # Make prediction using the Hugging Face model
-                result = self.client.predict(
-                    image=handle_file(temp_path),
-                    api_name="/predict"
-                )
-                print(f"Raw model output: {result}")
+                files = {
+                    "image": ("image.jpg", open(temp_path, "rb"), mime_type)
+                }
 
-                
-                # Process the result based on  model's output format
+                response = requests.post("https://bairi56-confidence-measure-model.hf.space/predict", files=files)
+                print("Response from Hugging Face:", response.status_code, response.text)
+                if response.status_code != 200:
+                    print(f"Hugging Face returned {response.status_code}: {response.text}")
+                    return None
+
+                try:
+                    result = response.json()
+                except Exception as e:
+                    print(f"Failed to parse JSON: {e}")
+                    print("Raw response content:", response.text)
+                    return None
+
+                print("Prediction result:", result)
+
+                # Same processing logic as before
                 if isinstance(result, str):
-                    # Try to extract the confidence value from the string using regex
                     match = re.search(r"Confidence:\s*([\d.]+)%", result)
                     if match:
                         confidence_percentage = float(match.group(1))
                         return round(confidence_percentage, 2)
-                    else:
-                        print(f"Could not extract confidence value from: {result}")
-                        return None
-
                 elif isinstance(result, (list, tuple)) and len(result) > 0:
                     confidence_value = result[0]
                     if isinstance(confidence_value, (int, float)):
                         if 0 <= confidence_value <= 1:
                             return round(confidence_value * 100, 2)
                         return round(confidence_value, 2)
-                else:
-                    print(f"Unexpected result format: {result}")
-                    return None
-                
+
+                print(f"Unexpected result format: {result}")
+                return None
             finally:
-                # Clean up the temporary file
                 if os.path.exists(temp_path):
                     os.unlink(temp_path)
-                    
+
         except Exception as e:
             print(f"Error processing image: {e}")
-            traceback.print_exc()  # Add this to show full error trace
-
             return None
+
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
 @api_view(['POST'])
