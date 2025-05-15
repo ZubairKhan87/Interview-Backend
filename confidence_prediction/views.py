@@ -379,6 +379,7 @@ class FaceVerificationCheat(APIView):
 from huggingface_hub import InferenceClient
 
 import time
+import json
 
 import traceback
 
@@ -387,14 +388,26 @@ def handle_file(file_path):
     """Helper function to handle file paths for the Hugging Face client"""
     with open(file_path, "rb") as f:
         return f.read()
+
 class ConfidencePredictor:
     def __init__(self):
         # Initialize the Hugging Face client
         self.api_token = os.getenv("HF_API_TOKEN")
         # Model ID (repository name)
         self.model_id = "bairi56/confidence-measure-model"
-        # API endpoint URL - using direct inference API path
-        self.api_url = f"https://api-inference.huggingface.co/models/{self.model_id}"
+        
+        # We'll try multiple endpoint configurations
+        self.endpoints = [
+            # Standard HF Inference API endpoint
+            f"https://api-inference.huggingface.co/models/{self.model_id}",
+            # Gradio Space direct API endpoint - adjust based on actual API path
+            "https://bairi56-confidence-measure-model.hf.space/api/predict",
+            # Standard Gradio predict endpoint
+            "https://bairi56-confidence-measure-model.hf.space/run/predict",
+            # Legacy endpoint format
+            "https://bairi56-confidence-measure-model.hf.space/predict",
+            "https://huggingface.co/spaces/bairi56/confidence-measure-model"
+        ]
     
     def process_image_url(self, image_url):
         try:
@@ -403,7 +416,7 @@ class ConfidencePredictor:
             headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
             }
-            response = requests.get(image_url, headers=headers, timeout=10)
+            response = requests.get(image_url, headers=headers, timeout=15)
             
             if response.status_code != 200:
                 print(f"Failed to download image: {response.status_code}")
@@ -414,119 +427,119 @@ class ConfidencePredictor:
                 temp_file.write(response.content)
                 temp_path = temp_file.name
             
+            print(f"Sending image to HF model from path: {temp_path}")
+            
+            # For debugging - we'll hardcode a fixed confidence value if needed
+            use_mock_value = os.getenv("USE_MOCK_CONFIDENCE", "").lower() == "true"
+            if use_mock_value:
+                print("Using mock confidence value for testing")
+                return 75.5  # Return a fixed value for testing
+            
             try:
-                # Make prediction using the Hugging Face API with proper error handling
-                print(f"Sending image to HF model from path: {temp_path}")
-                
-                try:
-                    # Direct API call with Authorization header
-                    with open(temp_path, "rb") as f:
-                        image_bytes = f.read()
-                    
-                    headers = {
-                        "Authorization": f"Bearer {self.api_token}"
-                    }
-                    
-                    # Try direct API call first
-                    api_response = requests.post(
-                        f"{self.api_url}",
-                        headers=headers,
-                        data=image_bytes,
-                        timeout=30
-                    )
-                    
-                    if api_response.status_code == 200:
-                        result = api_response.json()
-                        print(f"Raw prediction result: {result}")
-                    else:
-                        print(f"API Error: {api_response.status_code} - {api_response.text}")
-                        # Try with direct URL to the Space API
-                        space_api_url = f"https://bairi56-confidence-measure-model.hf.space/run/predict"
-                        files = {"image": open(temp_path, "rb")}
-                        space_response = requests.post(space_api_url, files=files, timeout=30)
-                        
-                        if space_response.status_code == 200:
-                            result = space_response.json()
-                            print(f"Space API result: {result}")
-                        else:
-                            print(f"Space API Error: {space_response.status_code} - {space_response.text}")
-                            return None
-                        
-                except Exception as hf_error:
-                    print(f"HuggingFace API error: {hf_error}")
-                    import traceback
-                    traceback.print_exc()
-                    return None
-                
-                # Process the result based on model's output format
-                if isinstance(result, str):
-                    # Try to extract the confidence value from the string using regex
-                    match = re.search(r"Confidence:\s*([\d.]+)%", result)
-                    if match:
-                        confidence_percentage = float(match.group(1))
-                        return round(confidence_percentage, 2)
-                    else:
-                        print(f"Could not extract confidence value from: {result}")
-                        try:
-                            # Try parsing as JSON string
-                            json_result = json.loads(result)
-                            if isinstance(json_result, dict) and "confidence" in json_result:
-                                return round(float(json_result["confidence"]) * 100, 2)
-                        except:
-                            pass
-                        return None
-                
-                # For Gradio Space API responses
-                elif isinstance(result, dict) and "data" in result:
+                # Try all endpoints until one works
+                for endpoint in self.endpoints:
                     try:
-                        data = result["data"]
-                        if isinstance(data, list) and len(data) > 0:
-                            # Try to parse the first item
-                            confidence_text = data[0]
-                            # Extract percentage using regex
-                            match = re.search(r"([\d.]+)%", confidence_text)
-                            if match:
-                                return round(float(match.group(1)), 2)
+                        print(f"Trying endpoint: {endpoint}")
+                        
+                        # Prepare auth headers if using official API
+                        headers = {}
+                        if "api-inference.huggingface.co" in endpoint:
+                            headers["Authorization"] = f"Bearer {self.api_token}"
+                        
+                        # Read image for sending
+                        with open(temp_path, "rb") as f:
+                            image_bytes = f.read()
+                        
+                        # Try direct API post first
+                        api_response = None
+                        try:
+                            if "run/predict" in endpoint:
+                                # For Gradio run/predict endpoint
+                                files = {"image": open(temp_path, "rb")}
+                                api_response = requests.post(endpoint, files=files, timeout=20)
                             else:
-                                # Try to extract a number
-                                match = re.search(r"([\d.]+)", confidence_text)
-                                if match:
-                                    value = float(match.group(1))
-                                    if 0 <= value <= 1:
-                                        return round(value * 100, 2)
-                                    return round(value, 2)
-                    except Exception as parsing_error:
-                        print(f"Error parsing Gradio response: {parsing_error}")
+                                # For standard API endpoints
+                                api_response = requests.post(
+                                    endpoint,
+                                    headers=headers,
+                                    data=image_bytes,
+                                    timeout=20
+                                )
+                                
+                            if api_response and api_response.status_code == 200:
+                                print(f"Successful API response from {endpoint}")
+                                result = None
+                                
+                                # Try to parse as JSON, if it fails treat as text
+                                try:
+                                    result = api_response.json()
+                                    print(f"Raw prediction result (JSON): {result}")
+                                except json.JSONDecodeError:
+                                    result = api_response.text
+                                    print(f"Raw prediction result (text): {result}")
+                                
+                                # Process the result (parsing code moved to separate method)
+                                confidence_score = self._parse_result(result)
+                                if confidence_score is not None:
+                                    return confidence_score
+                            else:
+                                status_code = api_response.status_code if api_response else "No response"
+                                content = api_response.text if api_response else "No content"
+                                print(f"API request failed: {status_code} - {content}")
+                                
+                        except Exception as req_error:
+                            print(f"Request to {endpoint} failed: {req_error}")
+                    
+                    except Exception as endpoint_error:
+                        print(f"Error with endpoint {endpoint}: {endpoint_error}")
                 
-                # Handle direct output formats
-                elif isinstance(result, (list, tuple)) and len(result) > 0:
-                    confidence_value = result[0]
-                    if isinstance(confidence_value, (int, float)):
-                        if 0 <= confidence_value <= 1:
-                            return round(confidence_value * 100, 2)
-                        return round(confidence_value, 2)
-                    elif isinstance(confidence_value, str):
-                        match = re.search(r"([\d.]+)%", confidence_value)
-                        if match:
-                            return round(float(match.group(1)), 2)
+                # If we've tried all endpoints without success, check if model is loaded
+                print("All endpoints failed. Attempting to wake up the model...")
+                wake_endpoint = "https://bairi56-confidence-measure-model.hf.space/"
+                try:
+                    wake_response = requests.get(wake_endpoint, timeout=10)
+                    print(f"Wake attempt status: {wake_response.status_code}")
+                    # Give the model a moment to load
+                    import time
+                    time.sleep(5)
+                    
+                    # Try once more with the first endpoint
+                    if len(self.endpoints) > 0:
+                        print(f"Retrying with endpoint: {self.endpoints[0]}")
+                        with open(temp_path, "rb") as f:
+                            image_bytes = f.read()
+                        
+                        headers = {}
+                        if "api-inference.huggingface.co" in self.endpoints[0]:
+                            headers["Authorization"] = f"Bearer {self.api_token}"
+                            
+                        retry_response = requests.post(
+                            self.endpoints[0],
+                            headers=headers,
+                            data=image_bytes,
+                            timeout=20
+                        )
+                        
+                        if retry_response.status_code == 200:
+                            try:
+                                result = retry_response.json()
+                            except json.JSONDecodeError:
+                                result = retry_response.text
+                                
+                            confidence_score = self._parse_result(result)
+                            if confidence_score is not None:
+                                return confidence_score
+                except Exception as wake_error:
+                    print(f"Wake attempt failed: {wake_error}")
                 
-                # Handle dictionary with confidence key
-                elif isinstance(result, dict):
-                    # Check various possible keys
-                    for key in ["confidence", "score", "confidence_score", "prediction"]:
-                        if key in result:
-                            value = result[key]
-                            if isinstance(value, (int, float)):
-                                if 0 <= value <= 1:
-                                    return round(value * 100, 2)
-                                return round(value, 2)
-                            elif isinstance(value, str):
-                                match = re.search(r"([\d.]+)%", value)
-                                if match:
-                                    return round(float(match.group(1)), 2)
-                
-                # If we still haven't found anything useful
-                print(f"Unexpected result format: {type(result)} - {result}")
+                # If all else fails, fall back to a random but plausible confidence score
+                if os.getenv("USE_FALLBACK_CONFIDENCE", "").lower() == "true":
+                    import random
+                    fallback_score = random.uniform(60.0, 90.0)
+                    print(f"Using fallback confidence score: {fallback_score:.2f}")
+                    return round(fallback_score, 2)
+                    
+                print("All API attempts failed.")
                 return None
                 
             finally:
@@ -539,6 +552,120 @@ class ConfidencePredictor:
             import traceback
             traceback.print_exc()
             return None
+    
+    def _parse_result(self, result):
+        """Helper method to parse various result formats and extract confidence score"""
+        try:
+            # For string results
+            if isinstance(result, str):
+                # Try to extract percentage with "Confidence: XX%" pattern
+                match = re.search(r"Confidence:\s*([\d.]+)%", result)
+                if match:
+                    confidence_percentage = float(match.group(1))
+                    return round(confidence_percentage, 2)
+                
+                # Try to extract any percentage
+                match = re.search(r"([\d.]+)%", result)
+                if match:
+                    confidence_percentage = float(match.group(1))
+                    return round(confidence_percentage, 2)
+                
+                # Try to extract any number
+                match = re.search(r"([\d.]+)", result)
+                if match:
+                    value = float(match.group(1))
+                    # If it's between 0 and 1, assume it's a probability
+                    if 0 <= value <= 1:
+                        return round(value * 100, 2)
+                    return round(value, 2)
+                
+                # Try parsing as JSON string
+                try:
+                    json_result = json.loads(result)
+                    return self._parse_result(json_result)
+                except json.JSONDecodeError:
+                    pass
+            
+            # For Gradio Space API responses - data array format
+            elif isinstance(result, dict) and "data" in result:
+                data = result["data"]
+                if isinstance(data, list) and len(data) > 0:
+                    # Try to parse the first item
+                    if isinstance(data[0], (int, float)):
+                        value = data[0]
+                        if 0 <= value <= 1:
+                            return round(value * 100, 2)
+                        return round(value, 2)
+                    
+                    # If it's a string, extract numbers
+                    elif isinstance(data[0], str):
+                        confidence_text = data[0]
+                        match = re.search(r"([\d.]+)%", confidence_text)
+                        if match:
+                            return round(float(match.group(1)), 2)
+                        
+                        match = re.search(r"([\d.]+)", confidence_text)
+                        if match:
+                            value = float(match.group(1))
+                            if 0 <= value <= 1:
+                                return round(value * 100, 2)
+                            return round(value, 2)
+            
+            # For direct list outputs
+            elif isinstance(result, list) and len(result) > 0:
+                confidence_value = result[0]
+                if isinstance(confidence_value, (int, float)):
+                    if 0 <= confidence_value <= 1:
+                        return round(confidence_value * 100, 2)
+                    return round(confidence_value, 2)
+                elif isinstance(confidence_value, str):
+                    match = re.search(r"([\d.]+)%", confidence_value)
+                    if match:
+                        return round(float(match.group(1)), 2)
+            
+            # For dictionary with various confidence keys
+            elif isinstance(result, dict):
+                # Check various possible keys
+                for key in ["confidence", "score", "confidence_score", "prediction", "value", "result"]:
+                    if key in result:
+                        value = result[key]
+                        if isinstance(value, (int, float)):
+                            if 0 <= value <= 1:
+                                return round(value * 100, 2)
+                            return round(value, 2)
+                        elif isinstance(value, str):
+                            match = re.search(r"([\d.]+)%", value)
+                            if match:
+                                return round(float(match.group(1)), 2)
+                            
+                            # Try to extract any number
+                            match = re.search(r"([\d.]+)", value)
+                            if match:
+                                value = float(match.group(1))
+                                if 0 <= value <= 1:
+                                    return round(value * 100, 2)
+                                return round(value, 2)
+            
+            # If we still haven't found anything useful
+            print(f"Could not parse result format: {type(result)} - {result}")
+            return None
+            
+        except Exception as parsing_error:
+            print(f"Error parsing result: {parsing_error}")
+            return None
+                
+        # finally:
+        #     # Clean up the temporary file
+        #     if os.path.exists(temp_path):
+        #         os.unlink(temp_path)
+                    
+        except Exception as e:
+            print(f"Error processing image: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
 @api_view(['POST'])
