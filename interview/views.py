@@ -23,7 +23,7 @@ from authentication.models import CandidateTable
 from groq import Groq
 
 from pathlib import Path
-
+from backend.settings import BASE_URL
 from dotenv import load_dotenv
 env_path = Path(__file__).resolve().parent.parent / '.env'
 load_dotenv(dotenv_path=env_path)
@@ -686,7 +686,7 @@ def verify_interview_frames(candidate_id, job_id):
         return None
     
 
-
+from django.conf import settings
 def confidence_prediction(candidate_id, job_id):
     """
     Call confidence prediction endpoint for all frames
@@ -703,9 +703,10 @@ def confidence_prediction(candidate_id, job_id):
         if not frames:
             print("No frames found in interview details")
             return None
+        
+        print("Base URL", settings.BASE_URL)
 
-        confidence_url = f"{settings.BASE_URL}/api/confidence_prediction/analyze-confidence/"
-
+        confidence_url = f"{settings.BASE_URL.rstrip('/')}/api/confidence_prediction/analyze-confidence/"
         # Extract full URL from CloudinaryResource or string
         frame_data = []
         for frame in frames:
