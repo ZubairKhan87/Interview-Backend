@@ -379,11 +379,7 @@ class FaceVerificationCheat(APIView):
 
 import time
 
-import os
-import io
-import re
-import base64
-import requests
+
 # confidence_prediction/views.py
 class ConfidencePredictor:
     def __init__(self):
@@ -396,78 +392,54 @@ class ConfidencePredictor:
 
     def process_image_url(self, image_url):
         try:
-            # Method 1: Try direct URL passing (if your model supports it)
-            try:
-                print(f"Attempting direct URL prediction: {image_url}")
-                result = self.client.predict(
-                    image=image_url,  # Try passing URL directly first
-                    api_name="/predict"
-                )
-                print(f"Direct URL result: {result}")
-                return self._parse_result(result)
-            except Exception as e:
-                print(f"Direct URL approach failed: {e}")
-                # Fall back to other methods
-                pass
+            # Download image from URL
+            print("image_url",image_url)
+            response = requests.get(image_url)
+            print("response of receing image..",response)
+            if response.status_code != 200:
+                print(f"Failed to download image: {response.status_code}")
+                return None
 
-            # Method 2: In-memory approach (no temp files)
-            print("Trying in-memory approach...")
-            response = requests.get(image_url, timeout=10)
-            response.raise_for_status() 
-            
-            # Create in-memory file-like object
-            image_bytes_io = io.BytesIO(response.content)
-            
-            # For Gradio client, we may need to convert to base64
-            base64_image = base64.b64encode(response.content).decode('utf-8')
-            
-            # You may need to structure this differently based on what your model expects
-            # Try different approaches that don't require temporary files
-            try:
-                # Approach 1: Pass the BytesIO object directly
-                result = self.client.predict(
-                    image=image_bytes_io,
-                    api_name="/predict"
-                )
-                return self._parse_result(result)
-            except Exception as e:
-                print(f"BytesIO approach failed: {e}")
-                
-                # Approach 2: Try with base64 encoding if BytesIO fails
+            # Create a temporary file to store the image
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
+                temp_file.write(response.content)
+                temp_path = temp_file.name
+
                 try:
+                    # Make prediction using the Hugging Face model
                     result = self.client.predict(
-                        image=f"data:image/jpeg;base64,{base64_image}",
+                        # image=temp_path,
+                        image=temp_path,
                         api_name="/predict"
                     )
-                    return self._parse_result(result)
-                except Exception as e:
-                    print(f"Base64 approach failed: {e}")
+
+                    print("result with handle.....",result)
+                    # Process the result based on  model's output format
+                    if isinstance(result, str):
+                        # Try to extract the confidence value from the string using regex
+                        match = re.search(r"Confidence:\s*([\d.]+)%", result)
+                        if match:
+                            confidence_percentage = float(match.group(1))
+                            return round(confidence_percentage, 2)
+                        else:
+                            print(f"Could not extract confidence value from: {result}")
+                            return None
+
+                    elif isinstance(result, (list, tuple)) and len(result) > 0:
+                        confidence_value = result[0]
+                        if isinstance(confidence_value, (int, float)):
+                            if 0 <= confidence_value <= 1:
+                                return round(confidence_value * 100, 2)
+                            return round(confidence_value, 2)
+                    else:
+                        print(f"Unexpected result format: {result}")
+                        return None
                     
-                    # Last resort: Use temporary file but with more robust error handling
-                    print("Falling back to temporary file approach...")
-                    import tempfile
-                    temp_path = None
-                    try:
-                        with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
-                            temp_file.write(response.content)
-                            temp_path = temp_file.name
-                            
-                        print(f"Created temporary file at: {temp_path}")
-                        result = self.client.predict(
-                            image=temp_path,
-                            api_name="/predict"
-                        )
-                        return self._parse_result(result)
-                    finally:
-                        if temp_path and os.path.exists(temp_path):
-                            try:
-                                os.unlink(temp_path)
-                                print(f"Deleted temporary file: {temp_path}")
-                            except Exception as e:
-                                print(f"Failed to delete temporary file: {e}")
-            
-            return None
-                
+                finally:
+                    # Clean up the temporary file
+                    if os.path.exists(temp_path):
+                        os.unlink(temp_path)
+                        
         except Exception as e:
             print(f"Error processing image: {e}")
             return None
