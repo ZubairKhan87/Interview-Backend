@@ -13,7 +13,7 @@ import os
 import requests
 from io import BytesIO
 import threading
-from gradio_client import Client, handle_file
+from gradio_client import Client, file as handle_file
 import tempfile
 import re
 import cloudinary
@@ -383,73 +383,61 @@ import time
 # confidence_prediction/views.py
 class ConfidencePredictor:
     def __init__(self):
-        # Load the Hugging Face API token from environment variable
-        self.api_token = os.getenv("HF_API_TOKEN")
-        print("api_token",self.api_token)
-        if not self.api_token:
-            raise ValueError("HF_API_TOKEN is not set in environment variables.")
-
-        # Initialize the Hugging Face Gradio Client
+        # Initialize the Hugging Face client
+        self.api_token =os.getenv("HF_API_TOKEN")
         self.client = Client(
             "bairi56/confidence-measure-model",
             hf_token=self.api_token
         )
-        print("client",self.client)
+
     def process_image_url(self, image_url):
         try:
             # Download image from URL
             response = requests.get(image_url)
-            if response.status_code != 200:
-                print(f"[❌] Failed to download image. Status code: {response.status_code}")
-                return {"error": f"Image download failed with status {response.status_code}"}
+            if response.status_code == 200:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp:
+                    temp.write(response.content)
+                    temp.flush()
 
             # Create a temporary file to store the image
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
-                temp_file.write(response.content)
-                temp_path = temp_file.name
+            # with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
+            #     temp_file.write(response.content)
+            #     temp_path = temp_file.name
 
-            try:
-                # Make prediction using the Hugging Face model
-               for attempt in range(3):
                 try:
-                    print(f"[🔄] Attempt {attempt + 1} to call model...")
+                    # Make prediction using the Hugging Face model
                     result = self.client.predict(
-                        image=handle_file(temp_path),
+                        # image=temp_path,
+                        image=handle_file(temp.name),
                         api_name="/predict"
                     )
-                    print("[✅] Prediction succeeded:", result)
-                    return result
-                except Exception as e:
-                    print(f"[⚠️] Attempt {attempt + 1} failed with error: {e}")
-                    time.sleep(2)
 
-                print("result with handle.....",result)
-                print("[❌] All prediction attempts failed.")
-                # Process the result based on  model's output format
-                if isinstance(result, str):
-                    # Try to extract the confidence value from the string using regex
-                    match = re.search(r"Confidence:\s*([\d.]+)%", result)
-                    if match:
-                        confidence_percentage = float(match.group(1))
-                        return round(confidence_percentage, 2)
+                    print("result with handle.....",result)
+                    # Process the result based on  model's output format
+                    if isinstance(result, str):
+                        # Try to extract the confidence value from the string using regex
+                        match = re.search(r"Confidence:\s*([\d.]+)%", result)
+                        if match:
+                            confidence_percentage = float(match.group(1))
+                            return round(confidence_percentage, 2)
+                        else:
+                            print(f"Could not extract confidence value from: {result}")
+                            return None
+
+                    elif isinstance(result, (list, tuple)) and len(result) > 0:
+                        confidence_value = result[0]
+                        if isinstance(confidence_value, (int, float)):
+                            if 0 <= confidence_value <= 1:
+                                return round(confidence_value * 100, 2)
+                            return round(confidence_value, 2)
                     else:
-                        print(f"Could not extract confidence value from: {result}")
+                        print(f"Unexpected result format: {result}")
                         return None
-
-                elif isinstance(result, (list, tuple)) and len(result) > 0:
-                    confidence_value = result[0]
-                    if isinstance(confidence_value, (int, float)):
-                        if 0 <= confidence_value <= 1:
-                            return round(confidence_value * 100, 2)
-                        return round(confidence_value, 2)
-                else:
-                    print(f"Unexpected result format: {result}")
-                    return None
-                
-            finally:
-                # Clean up the temporary file
-                if os.path.exists(temp_path):
-                    os.unlink(temp_path)
+                    
+                finally:
+                    # Clean up the temporary file
+                    if os.path.exists(temp.name):
+                        os.unlink(temp.name)
                     
         except Exception as e:
             print(f"Error processing image: {e}")
