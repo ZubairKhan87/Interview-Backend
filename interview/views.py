@@ -343,8 +343,6 @@ def chatbot_response(request):
                 print("Running Confidence Prediction Model...")
                 
                 # Pass the same frames used in face verification
-                print("candidate id ..",interview_state["current_candidate_id"])
-                print("job id ...",interview_state["current_job_id"])
                 confidence_results = confidence_prediction(
                     interview_state["current_candidate_id"],
                     interview_state["current_job_id"]
@@ -699,69 +697,40 @@ def confidence_prediction(candidate_id, job_id):
         if not interview_details:
             print("No interview details found")
             return None
-
+            
         # Check if frames exist
         frames = interview_details.get('interview_frames', [])
         if not frames:
             print("No frames found in interview details")
             return None
 
-        # Check if we should use fallback mode
-        use_fallback = os.getenv("USE_FALLBACK_CONFIDENCE", "").lower() == "true"
-        
-        if use_fallback:
-            print("Using fallback confidence calculation (local processing)")
-            # Generate a reasonable confidence score based on available frames
-            import random
-            base_score = random.uniform(65.0, 85.0)  # Base score between 65% and 85%
-            final_score = round(base_score, 2)
-            
-            print(f"Generated fallback confidence score: {final_score}")
-            return {
-                'final_score': final_score,
-                'method': 'fallback',
-                'processed_frames': len(frames)
-            }
-
-        # Normal processing using API endpoint
         confidence_url = f"{settings.BASE_URL}/api/confidence_prediction/analyze-confidence/"
         
-        # Use frames directly - they already have the full Cloudinary URLs
+        # Construct full URLs for frames
+        domain = settings.BASE_URL.rstrip('/')  # Remove trailing slash if present
         frame_data = []
         for frame in frames:
-            # Check if the URL is already complete
-            if frame["url"].startswith(("http://", "https://")):
-                frame_data.append({"url": frame["url"]})
-            else:
-                # Construct full URLs for frames if needed
-                domain = settings.BASE_URL.rstrip('/')  # Remove trailing slash if present
-                relative_url = frame["url"].lstrip('/')
-                full_url = f"{domain}/{relative_url}"
-                frame_data.append({"url": full_url})
-        
-        # For better performance, limit the number of frames processed
-        # Process at most 5 frames to avoid overwhelming the system
-        max_frames = min(5, len(frame_data))
-        if len(frame_data) > max_frames:
-            print(f"Limiting analysis to {max_frames} frames out of {len(frame_data)} available")
-            # Take frames at regular intervals
-            if len(frame_data) > 1:
-                step = len(frame_data) // max_frames
-                frame_data = frame_data[::step][:max_frames]
+            # Get relative URL and ensure it starts with a single forward slash
+            relative_url = frame["url"].lstrip('/')
+            full_url = f"{domain}/{relative_url}"
+            frame_data.append({"url": full_url})
         
         # Prepare data
         confidence_data = {
             "frames": frame_data
         }
         
-        print(f"Sending request with {len(frame_data)} frame URLs")
+        print(f"Sending request with frame URLs:")
+        # for frame in frame_data:
+        #     print(f"Frame URL: {frame['url']}")
         
-        # Call confidence prediction endpoint with proper timeout
+        # Call confidence prediction endpoint
         response = requests.post(
             confidence_url,
             json=confidence_data,
-            timeout=60  # Longer timeout for multiple frames
         )
+        
+        # print(f"Confidence prediction response status: {response.status_code}")
         
         if response.status_code == 200:
             result = response.json()
@@ -770,40 +739,60 @@ def confidence_prediction(candidate_id, job_id):
         else:
             print(f"Confidence prediction failed with status {response.status_code}")
             print(f"Response content: {response.text}")
-            
-            # If API fails, use fallback method
-            if os.getenv("USE_FALLBACK_ON_ERROR", "").lower() == "true":
-                print("API failed, using fallback confidence calculation")
-                import random
-                fallback_score = random.uniform(65.0, 85.0)
-                final_score = round(fallback_score, 2)
-                
-                print(f"Generated fallback confidence score: {final_score}")
-                return {
-                    'final_score': final_score,
-                    'method': 'fallback_on_error',
-                    'error': f"API error: {response.status_code}"
-                }
-            
             return None
         
     except Exception as e:
         print(f"Error in confidence prediction: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        
-        # Use fallback if enabled
-        if os.getenv("USE_FALLBACK_ON_ERROR", "").lower() == "true":
-            print("Exception occurred, using fallback confidence calculation")
-            import random
-            fallback_score = random.uniform(65.0, 85.0)
-            final_score = round(fallback_score, 2)
-            
-            print(f"Generated fallback confidence score: {final_score}")
-            return {
-                'final_score': final_score,
-                'method': 'fallback_on_exception',
-                'error': str(e)
-            }
-            
         return None
+
+
+
+
+import tempfile
+
+@api_view(['POST'])
+def transcribe_audio(request):
+    """
+    Endpoint to receive audio file and transcribe it using Groq's Whisper model
+    """
+    if 'audio' not in request.FILES:
+        return Response({'error': 'No audio file provided'}, status=400)
+    
+    audio_file = request.FILES['audio']
+    
+    # Save the uploaded file temporarily
+    with tempfile.NamedTemporaryFile(suffix='.webm', delete=False) as temp_file:
+        for chunk in audio_file.chunks():
+            temp_file.write(chunk)
+        temp_file_path = temp_file.name
+    
+    try:
+        # Transcribe using Groq's Whisper model
+        with open(temp_file_path, "rb") as file:
+            transcription = client.audio.transcriptions.create(
+                file=(temp_file_path, file.read()),
+                model="distil-whisper-large-v3-en",
+                response_format="verbose_json",
+            )
+        
+        # Extract transcribed text
+        transcribed_text = transcription.text
+        
+        # Clean up the temporary file
+        os.unlink(temp_file_path)
+        
+        return Response({
+            'transcription': transcribed_text,
+            'success': True
+        })
+    
+    except Exception as e:
+        # Clean up the temporary file in case of error
+        if os.path.exists(temp_file_path):
+            os.unlink(temp_file_path)
+        
+        print(f"Transcription error: {e}")
+        return Response({
+            'error': str(e),
+            'success': False
+        }, status=500)
