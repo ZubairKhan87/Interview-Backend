@@ -391,11 +391,10 @@ class ConfidencePredictor:
     def __init__(self):
         # Initialize the Hugging Face client
         self.api_token = os.getenv("HF_API_TOKEN")
-        # Use InferenceClient instead of Client for more reliability
-        self.client = InferenceClient(
-            "bairi56/confidence-measure-model",
-            token=self.api_token  # 'token' instead of 'hf_token'
-        )
+        # Model ID (repository name)
+        self.model_id = "bairi56/confidence-measure-model"
+        # API endpoint URL - using direct inference API path
+        self.api_url = f"https://api-inference.huggingface.co/models/{self.model_id}"
     
     def process_image_url(self, image_url):
         try:
@@ -416,28 +415,48 @@ class ConfidencePredictor:
                 temp_path = temp_file.name
             
             try:
-                # Make prediction using the Hugging Face model with proper error handling
+                # Make prediction using the Hugging Face API with proper error handling
                 print(f"Sending image to HF model from path: {temp_path}")
                 
                 try:
-                    # Using InferenceClient with better error handling
-                    result = self.client.post(
-                        json={"image": handle_file(temp_path).decode("latin1")}, 
-                        api_name="/predict"
+                    # Direct API call with Authorization header
+                    with open(temp_path, "rb") as f:
+                        image_bytes = f.read()
+                    
+                    headers = {
+                        "Authorization": f"Bearer {self.api_token}"
+                    }
+                    
+                    # Try direct API call first
+                    api_response = requests.post(
+                        f"{self.api_url}",
+                        headers=headers,
+                        data=image_bytes,
+                        timeout=30
                     )
-                    print(f"Raw prediction result: {result}")
+                    
+                    if api_response.status_code == 200:
+                        result = api_response.json()
+                        print(f"Raw prediction result: {result}")
+                    else:
+                        print(f"API Error: {api_response.status_code} - {api_response.text}")
+                        # Try with direct URL to the Space API
+                        space_api_url = f"https://bairi56-confidence-measure-model.hf.space/run/predict"
+                        files = {"image": open(temp_path, "rb")}
+                        space_response = requests.post(space_api_url, files=files, timeout=30)
+                        
+                        if space_response.status_code == 200:
+                            result = space_response.json()
+                            print(f"Space API result: {result}")
+                        else:
+                            print(f"Space API Error: {space_response.status_code} - {space_response.text}")
+                            return None
+                        
                 except Exception as hf_error:
                     print(f"HuggingFace API error: {hf_error}")
-                    # Try alternative method
-                    try:
-                        result = self.client.post(
-                            data=handle_file(temp_path),
-                            api_name="/predict"
-                        )
-                        print(f"Alternative method result: {result}")
-                    except Exception as alt_error:
-                        print(f"Alternative method failed: {alt_error}")
-                        return None
+                    import traceback
+                    traceback.print_exc()
+                    return None
                 
                 # Process the result based on model's output format
                 if isinstance(result, str):
@@ -449,8 +468,7 @@ class ConfidencePredictor:
                     else:
                         print(f"Could not extract confidence value from: {result}")
                         try:
-                            # Try parsing as JSON
-                            import json
+                            # Try parsing as JSON string
                             json_result = json.loads(result)
                             if isinstance(json_result, dict) and "confidence" in json_result:
                                 return round(float(json_result["confidence"]) * 100, 2)
@@ -458,20 +476,58 @@ class ConfidencePredictor:
                             pass
                         return None
                 
+                # For Gradio Space API responses
+                elif isinstance(result, dict) and "data" in result:
+                    try:
+                        data = result["data"]
+                        if isinstance(data, list) and len(data) > 0:
+                            # Try to parse the first item
+                            confidence_text = data[0]
+                            # Extract percentage using regex
+                            match = re.search(r"([\d.]+)%", confidence_text)
+                            if match:
+                                return round(float(match.group(1)), 2)
+                            else:
+                                # Try to extract a number
+                                match = re.search(r"([\d.]+)", confidence_text)
+                                if match:
+                                    value = float(match.group(1))
+                                    if 0 <= value <= 1:
+                                        return round(value * 100, 2)
+                                    return round(value, 2)
+                    except Exception as parsing_error:
+                        print(f"Error parsing Gradio response: {parsing_error}")
+                
+                # Handle direct output formats
                 elif isinstance(result, (list, tuple)) and len(result) > 0:
                     confidence_value = result[0]
                     if isinstance(confidence_value, (int, float)):
                         if 0 <= confidence_value <= 1:
                             return round(confidence_value * 100, 2)
                         return round(confidence_value, 2)
-                elif isinstance(result, dict) and "confidence" in result:
-                    confidence_value = result["confidence"]
-                    if 0 <= confidence_value <= 1:
-                        return round(confidence_value * 100, 2)
-                    return round(confidence_value, 2)
-                else:
-                    print(f"Unexpected result format: {type(result)} - {result}")
-                    return None
+                    elif isinstance(confidence_value, str):
+                        match = re.search(r"([\d.]+)%", confidence_value)
+                        if match:
+                            return round(float(match.group(1)), 2)
+                
+                # Handle dictionary with confidence key
+                elif isinstance(result, dict):
+                    # Check various possible keys
+                    for key in ["confidence", "score", "confidence_score", "prediction"]:
+                        if key in result:
+                            value = result[key]
+                            if isinstance(value, (int, float)):
+                                if 0 <= value <= 1:
+                                    return round(value * 100, 2)
+                                return round(value, 2)
+                            elif isinstance(value, str):
+                                match = re.search(r"([\d.]+)%", value)
+                                if match:
+                                    return round(float(match.group(1)), 2)
+                
+                # If we still haven't found anything useful
+                print(f"Unexpected result format: {type(result)} - {result}")
+                return None
                 
             finally:
                 # Clean up the temporary file
@@ -493,23 +549,38 @@ def analyze_confidence(request):
         if not frames:
             return Response({'error': 'No frames provided'}, status=400)
 
+        print(f"Received {len(frames)} frames for analysis")
+        
         # Use the HuggingFace-based predictor
         predictor = ConfidencePredictor()
         confidence_scores = []
+        errors = []
         
         # Process each frame
-        for frame in frames:
+        for i, frame in enumerate(frames):
             frame_url = frame.get('url')
             if not frame_url:
+                errors.append(f"Frame {i+1} missing URL")
                 continue
                 
+            print(f"Processing frame {i+1}/{len(frames)}: {frame_url}")
             score = predictor.process_image_url(frame_url)
             if score is not None:
                 confidence_scores.append(score)
-                print(f"Confidence Score of frame {frame_url}: {score}")
+                print(f"✓ Confidence Score for frame {i+1}: {score}")
+            else:
+                errors.append(f"Failed to process frame {i+1}: {frame_url}")
+                print(f"✗ Failed to process frame {i+1}: {frame_url}")
+        
+        print(f"Successfully processed {len(confidence_scores)}/{len(frames)} frames")
+        print(f"Scores: {confidence_scores}")
         
         if not confidence_scores:
-            return Response({'error': 'No valid predictions'}, status=400)
+            print("No valid predictions obtained")
+            return Response({
+                'error': 'No valid predictions',
+                'details': errors
+            }, status=400)
         
         # Calculate the average score
         final_score = sum(confidence_scores) / len(confidence_scores)
@@ -517,7 +588,10 @@ def analyze_confidence(request):
         
         return Response({
             'final_score': round(final_score, 2),
-            'individual_scores': confidence_scores
+            'individual_scores': confidence_scores,
+            'processed_frames': len(confidence_scores),
+            'total_frames': len(frames),
+            'errors': errors if errors else None
         })
         
     except Exception as e:
