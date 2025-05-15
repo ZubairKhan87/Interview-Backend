@@ -384,12 +384,13 @@ import traceback
 class ConfidencePredictor:
     def __init__(self):
         # Initialize the Hugging Face client
-        # self.api_token = os.getenv("HF_API_TOKEN")
-        # print("Loaded HF API Token:", self.api_token is not None)
-
+        self.api_token = os.getenv("HF_API_TOKEN")
+        print("Loaded HF API Token:", self.api_token is not None)
+        print(self.api_token)
+        print("Initializing client...")
         self.client = Client(
             "https://bairi56-confidence-measure-model.hf.space/",
-            "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"
+            api_token=self.api_token
         )
         print("Client initialized:", self.client is not None)
 
