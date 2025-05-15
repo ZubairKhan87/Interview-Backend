@@ -697,19 +697,19 @@ def confidence_prediction(candidate_id, job_id):
         interview_details = get_interview_details(job_id, candidate_id)
         if not interview_details:
             logger.warning("No interview details found")
-            return None
+            return {'final_score': 50.0, 'message': 'No interview details found'}
             
         # Check if frames exist
         frames = interview_details.get('interview_frames', [])
         if not frames:
             logger.warning("No frames found in interview details")
-            return None
+            return {'final_score': 50.0, 'message': 'No frames found'}
 
         logger.info(f"Found {len(frames)} frames for job_id={job_id}, candidate_id={candidate_id}")
         
         confidence_url = f"{settings.BASE_URL}/api/confidence_prediction/analyze-confidence/"
         
-        # Construct frame data without modifying the URLs
+        # Construct frame data with original Cloudinary URLs
         frame_data = []
         for frame in frames:
             frame_url = frame.get("url")
@@ -717,7 +717,6 @@ def confidence_prediction(candidate_id, job_id):
                 logger.warning(f"Frame has no URL: {frame}")
                 continue
                 
-            # Use the Cloudinary URL directly without modification
             frame_data.append({"url": frame_url})
         
         # Prepare data
@@ -727,12 +726,15 @@ def confidence_prediction(candidate_id, job_id):
         
         logger.info(f"Sending request to {confidence_url} with {len(frame_data)} frames")
         
-        # Call confidence prediction endpoint
+        # Log the actual data being sent
+        logger.debug(f"Request payload: {json.dumps(confidence_data)}")
+        
+        # Call confidence prediction endpoint with increased timeout
         response = requests.post(
             confidence_url,
             json=confidence_data,
             headers={'Content-Type': 'application/json'},
-            timeout=60  # Increase timeout for processing multiple frames
+            timeout=120  # Increased timeout for processing multiple frames
         )
         
         logger.info(f"Confidence prediction response status: {response.status_code}")
@@ -745,15 +747,18 @@ def confidence_prediction(candidate_id, job_id):
             except ValueError as e:
                 logger.error(f"Failed to parse JSON response: {e}")
                 logger.error(f"Response content: {response.text}")
-                return None
+                # Return a default value instead of None
+                return {'final_score': 50.0, 'message': 'Error parsing response'}
         else:
             logger.error(f"Confidence prediction failed with status {response.status_code}")
             logger.error(f"Response content: {response.text}")
-            return None
+            # Return a default value instead of None
+            return {'final_score': 50.0, 'message': f'Failed with status {response.status_code}'}
         
     except Exception as e:
         logger.error(f"Error in confidence prediction: {e}", exc_info=True)
-        return None
+        # Return a default value instead of None
+        return {'final_score': 50.0, 'message': f'Error occurred: {str(e)}'}
 
 
 
