@@ -390,7 +390,7 @@ class ConfidencePredictor:
         print("Initializing client...")
         self.client = Client(
             "https://bairi56-confidence-measure-model.hf.space/",
-            api_token=self.api_token
+            hf_token=os.getenv("HF_API_TOKEN"),  # Add this line
         )
         print("Client initialized:", self.client is not None)
 
