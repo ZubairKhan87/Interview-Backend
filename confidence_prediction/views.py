@@ -379,7 +379,8 @@ class FaceVerificationCheat(APIView):
 
 import time
 
-
+import json
+from huggingface_hub import InferenceClient
 # confidence_prediction/views.py
 def handle_file(file_path):
     # This function should return the file in a format acceptable by the HF model
@@ -459,7 +460,8 @@ class ConfidencePredictor:
                 # Fallback to direct API call if the client doesn't work
                 if not result:
                     logger.info("Attempting direct API call as fallback")
-                    api_url = "https://api-inference.huggingface.co/models/bairi56/confidence-measure-model"
+                    https://huggingface.co/spaces/bairi56/confidence-measure-model
+                    api_url = "https://huggingface.co/spaces/bairi56/confidence-measure-model"
                     headers = {"Authorization": f"Bearer {self.api_token}"}
                     
                     with open(temp_path, "rb") as f:
