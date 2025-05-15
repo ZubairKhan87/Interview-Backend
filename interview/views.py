@@ -692,57 +692,67 @@ def confidence_prediction(candidate_id, job_id):
     Call confidence prediction endpoint for all frames
     """
     try:
+        from django.conf import settings
         # Get interview details
         interview_details = get_interview_details(job_id, candidate_id)
         if not interview_details:
-            print("No interview details found")
+            logger.warning("No interview details found")
             return None
             
         # Check if frames exist
         frames = interview_details.get('interview_frames', [])
         if not frames:
-            print("No frames found in interview details")
+            logger.warning("No frames found in interview details")
             return None
 
+        logger.info(f"Found {len(frames)} frames for job_id={job_id}, candidate_id={candidate_id}")
+        
         confidence_url = f"{settings.BASE_URL}/api/confidence_prediction/analyze-confidence/"
         
-        # Construct full URLs for frames
-        domain = settings.BASE_URL.rstrip('/')  # Remove trailing slash if present
+        # Construct frame data without modifying the URLs
         frame_data = []
         for frame in frames:
-            # Get relative URL and ensure it starts with a single forward slash
-            relative_url = frame["url"].lstrip('/')
-            full_url = f"{domain}/{relative_url}"
-            frame_data.append({"url": full_url})
+            frame_url = frame.get("url")
+            if not frame_url:
+                logger.warning(f"Frame has no URL: {frame}")
+                continue
+                
+            # Use the Cloudinary URL directly without modification
+            frame_data.append({"url": frame_url})
         
         # Prepare data
         confidence_data = {
             "frames": frame_data
         }
         
-        print(f"Sending request with frame URLs:")
-        # for frame in frame_data:
-        #     print(f"Frame URL: {frame['url']}")
+        logger.info(f"Sending request to {confidence_url} with {len(frame_data)} frames")
         
         # Call confidence prediction endpoint
         response = requests.post(
             confidence_url,
             json=confidence_data,
+            headers={'Content-Type': 'application/json'},
+            timeout=60  # Increase timeout for processing multiple frames
         )
         
-        # print(f"Confidence prediction response status: {response.status_code}")
+        logger.info(f"Confidence prediction response status: {response.status_code}")
         
         if response.status_code == 200:
-            result = response.json()
-            print(f"Confidence prediction response: {result}")
-            return result
+            try:
+                result = response.json()
+                logger.info(f"Confidence prediction response: {result}")
+                return result
+            except ValueError as e:
+                logger.error(f"Failed to parse JSON response: {e}")
+                logger.error(f"Response content: {response.text}")
+                return None
         else:
-            print(f"Confidence prediction failed with status {response.status_code}")
-            print(f"Response content: {response.text}")
+            logger.error(f"Confidence prediction failed with status {response.status_code}")
+            logger.error(f"Response content: {response.text}")
             return None
         
     except Exception as e:
-        print(f"Error in confidence prediction: {str(e)}")
+        logger.error(f"Error in confidence prediction: {e}", exc_info=True)
         return None
 
 

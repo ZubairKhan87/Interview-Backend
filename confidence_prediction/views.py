@@ -381,6 +381,13 @@ import time
 
 
 # confidence_prediction/views.py
+def handle_file(file_path):
+    # This function should return the file in a format acceptable by the HF model
+    # Ensure the file exists
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"File not found: {file_path}")
+    return open(file_path, "rb")
+
 class ConfidencePredictor:
     def __init__(self):
         # Initialize the Hugging Face client
@@ -392,53 +399,70 @@ class ConfidencePredictor:
 
     def process_image_url(self, image_url):
         try:
-            # Download image from URL
-            response = requests.get(image_url)
+            logger.info(f"Processing image URL: {image_url}")
+            # Download image from URL with proper headers and timeout
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            response = requests.get(image_url, headers=headers, timeout=30)
+            
             if response.status_code != 200:
-                print(f"Failed to download image: {response.status_code}")
+                logger.error(f"Failed to download image: {response.status_code}, URL: {image_url}")
                 return None
-
+            
             # Create a temporary file to store the image
             with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
                 temp_file.write(response.content)
                 temp_path = temp_file.name
+                logger.info(f"Image saved to temporary file: {temp_path}")
 
             try:
+                # Verify the file exists and has content
+                if os.path.getsize(temp_path) == 0:
+                    logger.error("Downloaded image file is empty")
+                    return None
+                
                 # Make prediction using the Hugging Face model
-                result = self.client.predict(
-                    image=handle_file(temp_path),
-                    api_name="/predict"
-                )
+                logger.info("Sending request to Hugging Face model")
+                with open(temp_path, "rb") as f:
+                    result = self.client.predict(
+                        image=f,
+                        api_name="/predict"
+                    )
                 
+                logger.info(f"Raw model result: {result}")
                 
-                # Process the result based on  model's output format
+                # Process the result based on model's output format
                 if isinstance(result, str):
                     # Try to extract the confidence value from the string using regex
                     match = re.search(r"Confidence:\s*([\d.]+)%", result)
                     if match:
                         confidence_percentage = float(match.group(1))
+                        logger.info(f"Extracted confidence: {confidence_percentage}%")
                         return round(confidence_percentage, 2)
                     else:
-                        print(f"Could not extract confidence value from: {result}")
+                        logger.warning(f"Could not extract confidence value from: {result}")
                         return None
 
                 elif isinstance(result, (list, tuple)) and len(result) > 0:
                     confidence_value = result[0]
                     if isinstance(confidence_value, (int, float)):
+                        logger.info(f"Got numeric confidence value: {confidence_value}")
                         if 0 <= confidence_value <= 1:
                             return round(confidence_value * 100, 2)
                         return round(confidence_value, 2)
                 else:
-                    print(f"Unexpected result format: {result}")
+                    logger.warning(f"Unexpected result format: {result}")
                     return None
                 
             finally:
                 # Clean up the temporary file
                 if os.path.exists(temp_path):
                     os.unlink(temp_path)
+                    logger.info(f"Temporary file removed: {temp_path}")
                     
         except Exception as e:
-            print(f"Error processing image: {e}")
+            logger.error(f"Error processing image: {e}", exc_info=True)
             return None
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
@@ -448,30 +472,44 @@ def analyze_confidence(request):
     try:
         frames = request.data.get('frames', [])
         if not frames:
+            logger.warning("No frames provided in request")
             return Response({'error': 'No frames provided'}, status=400)
 
-        # Use the new HuggingFace-based predictor
+        logger.info(f"Received {len(frames)} frames for confidence analysis")
+        
+        # Use the HuggingFace-based predictor
         predictor = ConfidencePredictor()
         confidence_scores = []
         
         # Process each frame
-        for frame in frames:
+        for i, frame in enumerate(frames):
             frame_url = frame.get('url')
+            logger.info(f"Processing frame {i+1}/{len(frames)}: {frame_url}")
+            
+            if not frame_url:
+                logger.warning(f"Frame {i+1} has no URL")
+                continue
+                
             score = predictor.process_image_url(frame_url)
             if score is not None:
                 confidence_scores.append(score)
-                print("Confidence Scores of frame :", score)
+                logger.info(f"Frame {i+1} confidence score: {score}")
+            else:
+                logger.warning(f"Frame {i+1} returned no confidence score")
         
         if not confidence_scores:
+            logger.warning("No valid predictions obtained from any frames")
             return Response({'error': 'No valid predictions'}, status=400)
         
         # Calculate the average score
         final_score = sum(confidence_scores) / len(confidence_scores)
+        logger.info(f"Final average confidence score: {final_score:.2f}")
 
-        print(f"Average Score: {final_score:.2f} out of 100")
         return Response({
-            'final_score': final_score
+            'final_score': final_score,
+            'scores': confidence_scores  # Include individual scores for debugging
         })
         
     except Exception as e:
+        logger.error(f"Error in analyze_confidence: {e}", exc_info=True)
         return Response({'error': str(e)}, status=500)
