@@ -13,7 +13,7 @@ import os
 import requests
 from io import BytesIO
 import threading
-from gradio_client import Client, file as handle_file
+from gradio_client import Client, handle_file
 import tempfile
 import re
 import cloudinary
@@ -394,50 +394,49 @@ class ConfidencePredictor:
         try:
             # Download image from URL
             response = requests.get(image_url)
-            if response.status_code == 200:
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp:
-                    temp.write(response.content)
-                    temp.flush()
+            if response.status_code != 200:
+                print(f"Failed to download image: {response.status_code}")
+                return None
 
             # Create a temporary file to store the image
-            # with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
-            #     temp_file.write(response.content)
-            #     temp_path = temp_file.name
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
+                temp_file.write(response.content)
+                temp_path = temp_file.name
 
-                try:
-                    # Make prediction using the Hugging Face model
-                    result = self.client.predict(
-                        # image=temp_path,
-                        image=handle_file(temp.name),
-                        api_name="/predict"
-                    )
+            try:
+                # Make prediction using the Hugging Face model
+                result = self.client.predict(
+                    # image=temp_path,
+                    image=handle_file(temp_path),
+                    api_name="/predict"
+                )
 
-                    print("result with handle.....",result)
-                    # Process the result based on  model's output format
-                    if isinstance(result, str):
-                        # Try to extract the confidence value from the string using regex
-                        match = re.search(r"Confidence:\s*([\d.]+)%", result)
-                        if match:
-                            confidence_percentage = float(match.group(1))
-                            return round(confidence_percentage, 2)
-                        else:
-                            print(f"Could not extract confidence value from: {result}")
-                            return None
-
-                    elif isinstance(result, (list, tuple)) and len(result) > 0:
-                        confidence_value = result[0]
-                        if isinstance(confidence_value, (int, float)):
-                            if 0 <= confidence_value <= 1:
-                                return round(confidence_value * 100, 2)
-                            return round(confidence_value, 2)
+                print("result with handle.....",result)
+                # Process the result based on  model's output format
+                if isinstance(result, str):
+                    # Try to extract the confidence value from the string using regex
+                    match = re.search(r"Confidence:\s*([\d.]+)%", result)
+                    if match:
+                        confidence_percentage = float(match.group(1))
+                        return round(confidence_percentage, 2)
                     else:
-                        print(f"Unexpected result format: {result}")
+                        print(f"Could not extract confidence value from: {result}")
                         return None
-                    
-                finally:
-                    # Clean up the temporary file
-                    if os.path.exists(temp.name):
-                        os.unlink(temp.name)
+
+                elif isinstance(result, (list, tuple)) and len(result) > 0:
+                    confidence_value = result[0]
+                    if isinstance(confidence_value, (int, float)):
+                        if 0 <= confidence_value <= 1:
+                            return round(confidence_value * 100, 2)
+                        return round(confidence_value, 2)
+                else:
+                    print(f"Unexpected result format: {result}")
+                    return None
+                
+            finally:
+                # Clean up the temporary file
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
                     
         except Exception as e:
             print(f"Error processing image: {e}")
@@ -460,7 +459,7 @@ def analyze_confidence(request):
         # Process each frame
         for frame in frames:
             print("frame are passing to model ..",frame)
-            frame_url = frame.get('url')
+            frame_url = frame.get('filename')
             score = predictor.process_image_url(frame_url)
             if score is not None:
                 confidence_scores.append(score)
