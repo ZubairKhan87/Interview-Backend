@@ -393,7 +393,9 @@ class ConfidencePredictor:
     def process_image_url(self, image_url):
         try:
             # Download image from URL
+            print("image_url",image_url)
             response = requests.get(image_url)
+            print("response of receing image..",response)
             if response.status_code != 200:
                 print(f"Failed to download image: {response.status_code}")
                 return None
@@ -459,7 +461,7 @@ def analyze_confidence(request):
         # Process each frame
         for frame in frames:
             print("frame are passing to model ..",frame)
-            frame_url = frame.get('filename')
+            frame_url = frame.get('url')
             score = predictor.process_image_url(frame_url)
             if score is not None:
                 confidence_scores.append(score)
