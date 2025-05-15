@@ -685,7 +685,7 @@ def verify_interview_frames(candidate_id, job_id):
         logger.error(f"Error in frame verification: {e}")
         return None
     
-
+import json
 from django.conf import settings
 def confidence_prediction(candidate_id, job_id):
     """
