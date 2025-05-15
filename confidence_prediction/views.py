@@ -460,7 +460,6 @@ class ConfidencePredictor:
                 # Fallback to direct API call if the client doesn't work
                 if not result:
                     logger.info("Attempting direct API call as fallback")
-                    https://huggingface.co/spaces/bairi56/confidence-measure-model
                     api_url = "https://huggingface.co/spaces/bairi56/confidence-measure-model"
                     headers = {"Authorization": f"Bearer {self.api_token}"}
                     
