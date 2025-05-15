@@ -343,6 +343,8 @@ def chatbot_response(request):
                 print("Running Confidence Prediction Model...")
                 
                 # Pass the same frames used in face verification
+                print("candidate id ..",interview_state["current_candidate_id"])
+                print("job id ...",interview_state["current_job_id"])
                 confidence_results = confidence_prediction(
                     interview_state["current_candidate_id"],
                     interview_state["current_job_id"]
@@ -694,18 +696,20 @@ def confidence_prediction(candidate_id, job_id):
     try:
         # Get interview details
         interview_details = get_interview_details(job_id, candidate_id)
+        print("interview_details", interview_details)
         if not interview_details:
             print("No interview details found")
             return None
             
         # Check if frames exist
         frames = interview_details.get('interview_frames', [])
+        print("frames", frames)
         if not frames:
             print("No frames found in interview details")
             return None
-
+        print("urls of settings",settings.BASE_URL)
         confidence_url = f"{settings.BASE_URL}/api/confidence_prediction/analyze-confidence/"
-        
+        print("confidence_url", confidence_url)
         # Construct full URLs for frames
         domain = settings.BASE_URL.rstrip('/')  # Remove trailing slash if present
         frame_data = []
@@ -730,7 +734,8 @@ def confidence_prediction(candidate_id, job_id):
             json=confidence_data,
         )
         print("Raw prediction response:", response)
-
+        result = response.json()
+        print(f"Confidence prediction response: {result}")
         
         # print(f"Confidence prediction response status: {response.status_code}")
         
