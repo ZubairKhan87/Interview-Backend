@@ -646,19 +646,18 @@ def upload_candidate_profile_image(request):
     try:
         candidate = CandidateTable.objects.get(candidate=request.user)
         
-        if candidate.profile_image:
-            return Response(
-                {'error': 'Profile image already exists and cannot be modified'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
+        if candidate.profile_image and not request.user.is_superuser:
+                return Response(
+                    {'error': 'Profile image already exists and cannot be modified'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
         image_file = request.FILES.get('profile_image')
         if not image_file:
             return Response({'error': 'Profile image is required'}, status=400)
 
-        # Directly assign image file to CloudinaryField
         candidate.profile_image = image_file
-        candidate.save()
+        candidate.save(request_user=request.user)  # ✅ pass user here
 
         return Response({
             'message': 'Profile image uploaded successfully',
@@ -667,6 +666,9 @@ def upload_candidate_profile_image(request):
 
     except CandidateTable.DoesNotExist:
         return Response({'error': 'Profile not found'}, status=status.HTTP_404_NOT_FOUND)
+    except ValueError as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
     
 
 from .models import RecruiterTable
@@ -678,7 +680,7 @@ def get_recruiter_profile_image(request):
     try:
         recruiter = RecruiterTable.objects.get(recruiter=request.user)
         image_url = recruiter.profile_image.url if recruiter.profile_image else None
-
+        
         return Response({
             'profile_image': image_url,
             'recruiter_name': recruiter.recruiter_name
@@ -703,6 +705,7 @@ def upload_recruiter_profile_image(request):
 
         # Direct assignment to CloudinaryField
         recruiter.profile_image = image_file
+        
         recruiter.save()
 
         return Response({

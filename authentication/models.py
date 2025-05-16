@@ -33,13 +33,17 @@ class CandidateTable(models.Model):
     contact_information = models.JSONField(default=dict)  # Default empty dict
     location = models.TextField(blank=True, null=True)
     bio = models.TextField(blank=True, null=True)
-    def save(self, *args, **kwargs):
-        """Prevent non-admin users from modifying profile_image after it's set"""
-        if self.pk:  # If the object already exists
+    def save(self, *args, request_user=None, **kwargs):
+        if self.pk:  # Editing an existing instance
             original = CandidateTable.objects.get(pk=self.pk)
-            if original.profile_image and original.profile_image != self.profile_image:
+            if (
+                original.profile_image and
+                original.profile_image != self.profile_image and
+                (not request_user or not request_user.is_superuser)  # block non-admins
+            ):
                 raise ValueError("Profile image cannot be changed. Contact admin.")
         super().save(*args, **kwargs)
+
 
     def __str__(self):
         return self.candidate_name
