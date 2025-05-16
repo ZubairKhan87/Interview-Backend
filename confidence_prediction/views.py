@@ -522,8 +522,6 @@ class ConfidencePredictor:
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
 import json
-@api_view(['POST'])
-@permission_classes([AllowAny])  # Require authentication
 def clean_url(url):
     """
     Clean the URL by removing surrounding quotes or trailing characters.
@@ -542,8 +540,9 @@ def is_url_valid(url):
         print(f"URL check failed: {url}, Error: {str(e)}")
         return False
 @csrf_exempt
-@permission_classes([AllowAny])  # Allow any user to access this endpoint
 @api_view(['POST'])  # or ['GET', 'POST'] depending on your use
+@permission_classes([AllowAny])  # Require authentication
+
 def analyze_confidence(request):
     """
     Endpoint to analyze confidence based on image frames
