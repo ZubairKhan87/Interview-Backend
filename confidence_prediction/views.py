@@ -399,7 +399,7 @@ class ConfidencePredictor:
             return "Failed to initialize Hugging Face client."     
         
     def process_image_url(self, image_url):
-        try:
+        # try:
             # Download image from URL
             response = requests.get(image_url)
             if response.status_code != 200:
@@ -411,44 +411,45 @@ class ConfidencePredictor:
                 temp_file.write(response.content)
                 temp_path = temp_file.name
 
-            try:
-                # Make prediction using the Hugging Face model
-                result = self.client.predict(
-                    image=handle_file(temp_path),
-                    api_name="/predict"
-                )
-                
-                print("Result from model:", result)
-                
-                # Process the result based on  model's output format
-                if isinstance(result, str):
-                    # Try to extract the confidence value from the string using regex
-                    match = re.search(r"Confidence:\s*([\d.]+)%", result)
-                    if match:
-                        confidence_percentage = float(match.group(1))
-                        return round(confidence_percentage, 2)
-                    else:
-                        print(f"Could not extract confidence value from: {result}")
-                        return None
-
-                elif isinstance(result, (list, tuple)) and len(result) > 0:
-                    confidence_value = result[0]
-                    if isinstance(confidence_value, (int, float)):
-                        if 0 <= confidence_value <= 1:
-                            return round(confidence_value * 100, 2)
-                        return round(confidence_value, 2)
-                else:
-                    print(f"Unexpected result format: {result}")
-                    return None
-                
-            finally:
-                # Clean up the temporary file
                 if os.path.exists(temp_path):
-                    os.unlink(temp_path)
+                    # Make prediction using the Hugging Face model
+                    result = self.client.predict(
+                        image=handle_file(temp_path),
+                        api_name="/predict"
+                    )
                     
-        except Exception as e:
-            print(f"Error processing image: {e}")
-            return None
+                    print("Result from model:", result)
+                    
+                    # Process the result based on  model's output format
+                    if isinstance(result, str):
+                        # Try to extract the confidence value from the string using regex
+                        match = re.search(r"Confidence:\s*([\d.]+)%", result)
+                        if match:
+                            confidence_percentage = float(match.group(1))
+                            return round(confidence_percentage, 2)
+                        else:
+                            print(f"Could not extract confidence value from: {result}")
+                            return None
+
+                    elif isinstance(result, (list, tuple)) and len(result) > 0:
+                        confidence_value = result[0]
+                        if isinstance(confidence_value, (int, float)):
+                            if 0 <= confidence_value <= 1:
+                                return round(confidence_value * 100, 2)
+                            return round(confidence_value, 2)
+                    else:
+                        print(f"Unexpected result format: {result}")
+                        return None
+                
+                else:
+                    print(f"Temporary file not found: {temp_path}")
+                    # Clean up the temporary file
+                    if os.path.exists(temp_path):
+                        os.unlink(temp_path)
+                    
+        # except Exception as e:
+        #     print(f"Error processing image: {e}")
+        #     return None
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
 import json
@@ -477,82 +478,84 @@ def analyze_confidence(request):
     """
     Endpoint to analyze confidence based on image frames
     """
-    try:
-        # Debug the incoming request data
-        print("Request data type:", type(request.data))
+    # try:
+    # Debug the incoming request data
+    print("Request data type:", type(request.data))
 
-        # Parse the request data
-        frames = []
-        if isinstance(request.data, dict):
-            frames = request.data.get('frames', [])
-        elif isinstance(request.data, str):
-            try:
-                data = json.loads(request.data)
-                frames = data.get('frames', [])
-            except json.JSONDecodeError as e:
-                print(f"Failed to parse request data as JSON: {str(e)}")
-                return Response({'error': 'Invalid JSON data'}, status=400)
-
-        # Print raw request data
+    # Parse the request data
+    frames = []
+    if isinstance(request.data, dict):
+        frames = request.data.get('frames', [])
+    elif isinstance(request.data, str):
         try:
-            print("Request data content:", json.dumps(request.data))
-        except:
-            print("Request data (could not be JSON serialized):", request.data)
+            data = json.loads(request.data)
+            print("Parsed request data json:", data)
+            frames = data.get('frames', [])
+            print("frames from parsed data:", frames)
+        except json.JSONDecodeError as e:
+            print(f"Failed to parse request data as JSON: {str(e)}")
+            return Response({'error': 'Invalid JSON data'}, status=400)
 
-        if not frames:
-            print("No frames provided in request")
-            return Response({'error': 'No frames provided'}, status=400)
+    # Print raw request data
+    try:
+        print("Request data content:", json.dumps(request.data))
+    except:
+        print("Request data (could not be JSON serialized):", request.data)
 
-        print(f"Received {len(frames)} frames")
+    if not frames:
+        print("No frames provided in request")
+        return Response({'error': 'No frames provided'}, status=400)
 
-        # Clean and validate URLs
-        for frame in frames:
-            if isinstance(frame, dict) and 'url' in frame:
-                original_url = frame['url']
-                cleaned_url = clean_url(original_url)
-                print(f"Original URL: {original_url}")
-                print(f"Cleaned URL: {cleaned_url}")
-                if not is_url_valid(cleaned_url):
-                    print(f"Invalid or unreachable URL: {cleaned_url}")
-                    continue
-                frame['url'] = cleaned_url
+    print(f"Received {len(frames)} frames")
 
-        # Initialize Hugging Face-based predictor
-        predictor = ConfidencePredictor()
-        print("Predictor initialized:", predictor)
-        print("Predictor client:", predictor.client)
-        if predictor.client is None:
-            print("Failed to initialize predictor client.")
-            return Response({'error': 'Failed to initialize confidence predictor'}, status=500)
-
-        confidence_scores = []
-
-        for frame in frames:
-            if not isinstance(frame, dict) or 'url' not in frame:
-                print(f"Invalid frame format: {frame}")
+    # Clean and validate URLs
+    for frame in frames:
+        if isinstance(frame, dict) and 'url' in frame:
+            original_url = frame['url']
+            cleaned_url = clean_url(original_url)
+            print(f"Original URL: {original_url}")
+            print(f"Cleaned URL: {cleaned_url}")
+            if not is_url_valid(cleaned_url):
+                print(f"Invalid or unreachable URL: {cleaned_url}")
                 continue
+            frame['url'] = cleaned_url
 
-            frame_url = frame.get('url')
-            print(f"Processing frame URL: {frame_url}")
-            score = predictor.process_image_url(frame_url)
-            print(f"Score for frame {frame_url}: {score}")
-            if score is not None:
-                confidence_scores.append(score)
-                print(f"Confidence Score for frame: {score}")
-            else:
-                print(f"Failed to get score for frame: {frame_url}")
+    # Initialize Hugging Face-based predictor
+    predictor = ConfidencePredictor()
+    print("Predictor initialized:", predictor)
+    print("Predictor client:", predictor.client)
+    if predictor.client is None:
+        print("Failed to initialize predictor client.")
+        return Response({'error': 'Failed to initialize confidence predictor'}, status=500)
 
-        print(f"All scores: {confidence_scores}")
+    confidence_scores = []
 
-        if not confidence_scores:
-            return Response({'error': 'No valid predictions'}, status=400)
+    for frame in frames:
+        if not isinstance(frame, dict) or 'url' not in frame:
+            print(f"Invalid frame format: {frame}")
+            continue
 
-        final_score = sum(confidence_scores) / len(confidence_scores)
-        print(f"Average confidence score: {final_score:.2f}")
+        frame_url = frame.get('url')
+        print(f"Processing frame URL: {frame_url}")
+        score = predictor.process_image_url(frame_url)
+        print(f"Score for frame {frame_url}: {score}")
+        if score is not None:
+            confidence_scores.append(score)
+            print(f"Confidence Score for frame: {score}")
+        else:
+            print(f"Failed to get score for frame: {frame_url}")
 
-        return Response({'final_score': final_score})
+    print(f"All scores: {confidence_scores}")
 
-    except Exception as e:
-        print(f"Error in analyze_confidence: {str(e)}")
-        traceback.print_exc()
-        return Response({'error': str(e)}, status=500)
+    if not confidence_scores:
+        return Response({'error': 'No valid predictions'}, status=400)
+
+    final_score = sum(confidence_scores) / len(confidence_scores)
+    print(f"Average confidence score: {final_score:.2f}")
+
+    return Response({'final_score': final_score})
+
+    # except Exception as e:
+    #     print(f"Error in analyze_confidence: {str(e)}")
+    #     traceback.print_exc()
+    #     return Response({'error': str(e)}, status=500)
