@@ -369,7 +369,7 @@ def chatbot_response(request):
                     print(f"Error updating confidence prediction: {e}")
 
             # Run confidence prediction in a separate thread
-            confidence_thread = threading.Thread(target=run_confidence_prediction, daemon=True)
+            confidence_thread = threading.Thread(target=run_confidence_prediction)
             confidence_thread.start()
             # Move this calculation inside the function
             if interview_state["total_questions"] > 0:
@@ -412,7 +412,7 @@ def chatbot_response(request):
                         print(f"Error updating application: {e}")
         
         # Start the verification in a background thread
-        thread = threading.Thread(target=run_face_verification, daemon=True)
+        thread = threading.Thread(target=run_face_verification)
         thread.start()
         
         response_data = {
