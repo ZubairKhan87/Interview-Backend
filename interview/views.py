@@ -713,8 +713,8 @@ def confidence_prediction(candidate_id, job_id):
             print("No frames found in interview details")
             return None
         print("Number of frames found:", len(frames))
-        
-        confidence_url = f"{settings.BASE_URL}/api/confidence_prediction/analyze-confidence/"
+        base_url = os.getenv("BASE_URL")
+        confidence_url = f"{base_url}/api/confidence_prediction/analyze-confidence/"
         print("confidence_url", confidence_url)
         
         frame_data = []

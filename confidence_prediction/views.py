@@ -383,113 +383,40 @@ import traceback
 # confidence_prediction/views.py
 class ConfidencePredictor:
     def __init__(self):
-        try:
-            # Initialize the Hugging Face client
-            self.api_token = os.getenv("HF_API_TOKEN")
-            print("Hugging Face API token:", "Found" if self.api_token else "Not found")
-            
-            # Add error handling and retry logic for client initialization
-            max_retries = 3
-            retry_count = 0
-            
-            while retry_count < max_retries:
-                try:
-                    self.client = Client(
-                        "https://bairi56-confidence-measure-model.hf.space",
-                        hf_token=self.api_token,
-                    )
-                    print("Hugging Face client initialized successfully")
-                    break
-                except Exception as e:
-                    retry_count += 1
-                    print(f"Attempt {retry_count}/{max_retries} to initialize Hugging Face client failed: {str(e)}")
-                    if retry_count >= max_retries:
-                        raise
-                    time.sleep(2)  # Wait before retrying
-        except Exception as e:
-            print(f"Failed to initialize Hugging Face client: {str(e)}")
-            traceback.print_exc()
-            self.client = None
+      
+        # Initialize the Hugging Face client
+        self.api_token = os.getenv("HF_API_TOKEN")
+        self.client = Client(
+            "bairi56/confidence-measure-model",
+            hf_token=self.api_token
+        )
+        if not self.client:
+            print("Failed to initialize Hugging Face client.")
+            raise ValueError("Failed to initialize Hugging Face client.")     
         
     def process_image_url(self, image_url):
-        if self.client is None:
-            print("Hugging Face client not initialized, cannot process image")
-            return None
-            
         try:
-            print(f"Processing image URL: {image_url}")
-            
-            # Clean the URL - remove any trailing characters that aren't part of the URL
-            clean_url = image_url.rstrip("';")
-            print(f"Cleaned URL: {clean_url}")
-            
-            # Download image from URL with proper error handling
-            try:
-                headers = {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-                }
-                
-                # For Cloudinary URLs, ensure we're getting the raw image
-                if 'cloudinary.com' in clean_url:
-                    # Make sure we're getting an image format
-                    if not any(ext in clean_url.lower() for ext in ['.jpg', '.jpeg', '.png']):
-                        # If no format is specified, append .jpg
-                        if '?' in clean_url:
-                            clean_url = clean_url.split('?')[0] + '.jpg?' + clean_url.split('?')[1]
-                        else:
-                            clean_url = clean_url + '.jpg'
-                
-                response = requests.get(clean_url, headers=headers, timeout=60)
-                response.raise_for_status()
-                
-                # Check if we got an image
-                content_type = response.headers.get('Content-Type', '')
-                if not content_type.startswith('image/'):
-                    print(f"Warning: Content type is not an image: {content_type}")
-                    print(f"First 100 bytes of response: {response.content[:100]}")
-                    
-            except requests.exceptions.RequestException as e:
-                print(f"Failed to download image: {str(e)}")
-                print(f"URL attempted: {clean_url}")
+            # Download image from URL
+            response = requests.get(image_url)
+            if response.status_code != 200:
+                print(f"Failed to download image: {response.status_code}")
                 return None
-                
-            print(f"Image downloaded successfully: {response.status_code}, Content length: {len(response.content)}")
-            
+            print("Image downloaded successfully",response)
             # Create a temporary file to store the image
             with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
                 temp_file.write(response.content)
                 temp_path = temp_file.name
-                print(f"Temporary file created successfully: {temp_path}")
-                
+
             try:
-                # Verify the image file
-                try:
-                    img = Image.open(temp_path)
-                    img_size = img.size
-                    print(f"Image verified: {img_size[0]}x{img_size[1]}")
-                    
-                    # Save the image in a format that's definitely compatible
-                    img = img.convert('RGB')  # Convert to RGB to ensure compatibility
-                    img.save(temp_path, 'JPEG')
-                    print("Image converted to JPEG format")
-                    
-                except Exception as e:
-                    print(f"Warning: Could not verify image with PIL: {str(e)}")
-                
                 # Make prediction using the Hugging Face model
-                try:
-                    print("Sending image to Hugging Face model...")
-                    result = self.client.predict(
-                        image=handle_file(temp_path),
-                        api_name="/predict"
-                    )
-                    print("Result from Hugging Face model:", result)
-                except Exception as e:
-                    print(f"Error calling Hugging Face model: {str(e)}")
-                    traceback.print_exc()
-                    return None
+                result = self.client.predict(
+                    image=handle_file(temp_path),
+                    api_name="/predict"
+                )
                 
-                # Process the result based on model's output format
+                print("Result from model:", result)
+                
+                # Process the result based on  model's output format
                 if isinstance(result, str):
                     # Try to extract the confidence value from the string using regex
                     match = re.search(r"Confidence:\s*([\d.]+)%", result)
@@ -499,6 +426,7 @@ class ConfidencePredictor:
                     else:
                         print(f"Could not extract confidence value from: {result}")
                         return None
+
                 elif isinstance(result, (list, tuple)) and len(result) > 0:
                     confidence_value = result[0]
                     if isinstance(confidence_value, (int, float)):
@@ -513,11 +441,9 @@ class ConfidencePredictor:
                 # Clean up the temporary file
                 if os.path.exists(temp_path):
                     os.unlink(temp_path)
-                    print(f"Temporary file removed: {temp_path}")
                     
         except Exception as e:
-            print(f"Error processing image: {str(e)}")
-            traceback.print_exc()
+            print(f"Error processing image: {e}")
             return None
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
