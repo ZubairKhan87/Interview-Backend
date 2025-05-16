@@ -395,7 +395,7 @@ class ConfidencePredictor:
             while retry_count < max_retries:
                 try:
                     self.client = Client(
-                        "https://huggingface.co/spaces/bairi56/confidence-measure-model",
+                        "https://bairi56-confidence-measure-model.hf.space",
                         hf_token=self.api_token,
                     )
                     print("Hugging Face client initialized successfully")
