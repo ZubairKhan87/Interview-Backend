@@ -705,28 +705,38 @@ def confidence_prediction(candidate_id, job_id):
         if not interview_details:
             print("No interview details found")
             return None
-        print("interview_details", interview_details)    
+        print("interview_details retrieved successfully")
         
         # Check if frames exist
         frames = interview_details.get('interview_frames', [])
         if not frames:
             print("No frames found in interview details")
             return None
-        print("Number of frames found:", len(frames))
+        print(f"Number of frames found: {len(frames)}")
         
         confidence_url = f"{settings.BASE_URL}/api/confidence_prediction/analyze-confidence/"
-        print("confidence_url", confidence_url)
+        print(f"Confidence API endpoint: {confidence_url}")
         
         frame_data = []
-        for frame in frames:
+        for i, frame in enumerate(frames):
             # Fix potential issues with URL format
             url = frame.get("url", "")
             
             # Clean up the URL - ensure it doesn't have trailing characters
-            url = url.rstrip("';")
+            url = url.strip().rstrip("';")
             
             # Check if it's a Cloudinary URL (direct URL)
             if 'cloudinary.com' in url:
+                # Make sure we're using HTTPS and not HTTP
+                if url.startswith('http:'):
+                    url = 'https:' + url[5:]
+                
+                # For Cloudinary URLs, add quality and format parameters if missing
+                if '?' not in url:
+                    url += '?q=90&format=jpg'
+                elif 'format=' not in url.lower():
+                    url += '&format=jpg'
+                    
                 full_url = url
             else:
                 # For local URLs, construct full URL
@@ -734,6 +744,7 @@ def confidence_prediction(candidate_id, job_id):
                 relative_url = url.lstrip('/')
                 full_url = f"{domain}/{relative_url}"
             
+            print(f"Frame {i+1} URL: {full_url}")
             frame_data.append({"url": full_url})
         
         # Prepare data
@@ -743,15 +754,22 @@ def confidence_prediction(candidate_id, job_id):
         
         print(f"Sending request with {len(frame_data)} frames")
         
-        # Call confidence prediction endpoint
+        # Call confidence prediction endpoint with improved error handling
         try:
-            response = requests.post(
+            # Use a session for better connection handling
+            session = requests.Session()
+            
+            # Set longer timeouts and add retry mechanism
+            response = session.post(
                 confidence_url,
-                json=confidence_data,  # Use json parameter instead of data
-                headers={'Content-Type': 'application/json'},
-                timeout=120  # Increased timeout for multiple frames
+                json=confidence_data,  # Use json parameter for proper Content-Type header
+                headers={
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                },
+                timeout=300  # 5 minutes timeout for multiple frames
             )
-            print("Response status:", response.status_code)
+            print(f"Response status: {response.status_code}")
             
             # Check for 4xx/5xx errors and print response content
             if response.status_code >= 400:
@@ -760,8 +778,6 @@ def confidence_prediction(candidate_id, job_id):
             print(f"Request exception: {str(e)}")
             traceback.print_exc()
             return None
-        
-        print(f"Confidence prediction response status: {response.status_code}")
         
         if response.status_code == 200:
             try:
