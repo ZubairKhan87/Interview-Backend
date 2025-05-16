@@ -400,43 +400,118 @@ class ConfidencePredictor:
         # print("api_token",self.api_token)
         if not self.api_token:
             print("HF_API_TOKEN not set")
-            self.client = None
+            self.api_token = None
+
             return
-        self.client = Client("bairi56/confidence-measure-model", hf_token=self.api_token)  # Changed to token parameter
-        print("client........",self.client)
-    def process_image_url(self, image_url):
+        # self.client = Client("bairi56/confidence-measure-model", hf_token=self.api_token)  # Changed to token parameter
+        # print("client........",self.client)
+
+        # Test the connection to Hugging Face
         try:
-            import re
-            from gradio_client import handle_file
+            # Direct API endpoint for model inference
+            self.api_url = "https://huggingface.co/spaces/bairi56/confidence-measure-model"
             
-            # Use handle_file directly with the URL as shown in your example
-            # This is the key change - handle_file can process URLs directly
-            result = self.client.predict(
-                image=handle_file(image_url),
-                api_name="/predict"
+            # Test the connection with a simple request
+            headers = {"Authorization": f"Bearer {self.api_token}"}
+            print("headers",headers)    
+            response = requests.get(self.api_url, headers=headers)
+            print("response",response)
+            if response.status_code in [200, 404]:  # 404 is normal for just checking API availability
+                print(f"HuggingFace API connection successful: {response.status_code}")
+                self.client_ready = True
+            else:
+                print(f"HuggingFace API connection failed: {response.status_code}")
+                self.client_ready = False
+        except Exception as e:
+            import traceback
+            print(f"Error initializing HuggingFace connection: {e}")
+            traceback.print_exc()
+            self.client_ready = False
+    def process_image_url(self, image_url):
+        """Process an image URL directly using the Hugging Face Inference API."""
+        try:
+            import requests
+            import re
+            import json
+            
+            if not self.client_ready:
+                print("HuggingFace client not ready")
+                return None
+            
+            headers = {"Authorization": f"Bearer {self.api_token}"}
+            print("headers",headers)
+            # First try: Send the URL directly to the API
+            payload = {"inputs": {"image": image_url}}
+            print(f"Sending URL to HuggingFace API: {image_url}")
+            
+            response = requests.post(
+                self.api_url,
+                headers=headers,
+                json=payload,
+                timeout=30
             )
             
-            print(f"Raw result: {result}")
+            # If direct URL approach fails, download and send the image
+            if response.status_code != 200:
+                print(f"Direct URL approach failed: {response.status_code}, {response.text}")
+                print("Trying with downloaded image...")
+                
+                # Download the image
+                img_response = requests.get(image_url, timeout=10)
+                if img_response.status_code != 200:
+                    print(f"Failed to download image: {img_response.status_code}")
+                    return None
+                
+                # Send the binary data
+                response = requests.post(
+                    self.api_url,
+                    headers=headers,
+                    data=img_response.content,
+                    timeout=30
+                )
             
-            # Parse the result based on its format
-            if isinstance(result, str):
-                match = re.search(r"Confidence:\s*([\d.]+)%", result)
-                return round(float(match.group(1)), 2) if match else None
-            elif isinstance(result, (list, tuple)) and result:
-                val = result[0]
-                return round(val * 100, 2) if 0 <= val <= 1 else round(val, 2)
-            elif isinstance(result, dict) and 'confidence' in result:
-                return round(float(result['confidence']) * 100, 2)
+            if response.status_code != 200:
+                print(f"HuggingFace API call failed: {response.status_code}, {response.text}")
+                return None
             
-            print(f"Unexpected result format: {type(result)}, content: {result}")
-            return None
-            
+            # Parse the result
+            try:
+                result = response.json()
+                print(f"Raw result: {result}")
+                
+                # Handle different result formats
+                if isinstance(result, list) and result and isinstance(result[0], dict) and 'score' in result[0]:
+                    # Standard HF classification format
+                    return round(float(result[0]['score']) * 100, 2)
+                elif isinstance(result, dict) and 'confidence' in result:
+                    # Custom format
+                    return round(float(result['confidence']) * 100, 2)
+                elif isinstance(result, (list, tuple)) and result:
+                    # Simple value in list
+                    val = result[0]
+                    return round(val * 100, 2) if 0 <= val <= 1 else round(val, 2)
+                elif isinstance(result, str):
+                    # Text format
+                    match = re.search(r"Confidence:\s*([\d.]+)%", result)
+                    return round(float(match.group(1)), 2) if match else None
+                
+                print(f"Unexpected result format: {type(result)}, content: {result}")
+                return None
+                
+            except json.JSONDecodeError:
+                # Handle text response
+                text_result = response.text
+                print(f"Text result: {text_result}")
+                match = re.search(r"Confidence:\s*([\d.]+)%", text_result)
+                if match:
+                    return round(float(match.group(1)), 2)
+                return None
+                
         except Exception as e:
             import traceback
             print(f"Error processing image: {e}")
             traceback.print_exc()
             return None
-
 def clean_url(url):
     """
     Clean the URL by removing surrounding quotes or trailing characters.
@@ -461,6 +536,11 @@ import json
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def analyze_confidence(request):
+    import json
+    import traceback
+    from django.http import JsonResponse
+    from rest_framework.response import Response
+    
     try:
         frames = []
         if isinstance(request.data, dict):
@@ -475,31 +555,56 @@ def analyze_confidence(request):
         if not frames:
             return Response({'error': 'No frames provided'}, status=400)
 
+        # Clean URLs
         for frame in frames:
             if isinstance(frame, dict) and 'url' in frame:
-                frame['url'] = clean_url(frame['url'])
+                # Ensure URL is clean (removing quotes and extra characters)
+                frame['url'] = frame['url'].strip("'\" ")
 
         predictor = ConfidencePredictor()
-        if not predictor.client:
-            return Response({'error': 'HuggingFace model not initialized'}, status=500)
+        if not predictor.client_ready:
+            return Response({'error': 'HuggingFace API connection failed'}, status=500)
 
         confidence_scores = []
+        frame_results = []
+        failed_frames = []
 
-        for frame in frames:
+        for i, frame in enumerate(frames):
             url = frame.get("url")
-            print(f"Processing: {url}")
-            if is_url_valid(url):
+            print(f"Processing frame {i+1}/{len(frames)}: {url}")
+            
+            # Check if URL is valid (you need to implement is_url_valid or use the logic below)
+            if url and url.startswith(('http://', 'https://')):
                 score = predictor.process_image_url(url)
                 if score is not None:
                     confidence_scores.append(score)
+                    frame_results.append({
+                        "url": url,
+                        "confidence_score": score
+                    })
+                else:
+                    print(f"No valid prediction for frame: {url}")
+                    failed_frames.append(url)
             else:
                 print(f"Invalid URL skipped: {url}")
+                failed_frames.append(url)
 
         if not confidence_scores:
-            return Response({'error': 'No valid predictions'}, status=400)
+            return Response({
+                'error': 'No valid predictions',
+                'failed_frames': failed_frames
+            }, status=400)
 
         avg_score = round(sum(confidence_scores) / len(confidence_scores), 2)
-        return Response({'final_score': avg_score})
+        
+        # Return detailed results including individual frame scores
+        return Response({
+            'final_score': avg_score,
+            'frame_count': len(frames),
+            'processed_frames': len(confidence_scores),
+            'failed_frames': failed_frames,
+            'frame_results': frame_results
+        })
 
     except Exception as e:
         traceback.print_exc()
