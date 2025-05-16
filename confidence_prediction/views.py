@@ -386,13 +386,17 @@ class ConfidencePredictor:
       
         # Initialize the Hugging Face client
         self.api_token = os.getenv("HF_API_TOKEN")
+        if not self.api_token:
+            print("HF_API_TOKEN not found in environment")
+            return "API configuration error. Please contact support."
         self.client = Client(
             "bairi56/confidence-measure-model",
             hf_token=self.api_token
         )
+        print("self.client iw ...",self.client)
         if not self.client:
             print("Failed to initialize Hugging Face client.")
-            raise ValueError("Failed to initialize Hugging Face client.")     
+            return "Failed to initialize Hugging Face client."     
         
     def process_image_url(self, image_url):
         try:
@@ -515,6 +519,8 @@ def analyze_confidence(request):
 
         # Initialize Hugging Face-based predictor
         predictor = ConfidencePredictor()
+        print("Predictor initialized:", predictor)
+        print("Predictor client:", predictor.client)
         if predictor.client is None:
             print("Failed to initialize predictor client.")
             return Response({'error': 'Failed to initialize confidence predictor'}, status=500)
@@ -529,6 +535,7 @@ def analyze_confidence(request):
             frame_url = frame.get('url')
             print(f"Processing frame URL: {frame_url}")
             score = predictor.process_image_url(frame_url)
+            print(f"Score for frame {frame_url}: {score}")
             if score is not None:
                 confidence_scores.append(score)
                 print(f"Confidence Score for frame: {score}")
