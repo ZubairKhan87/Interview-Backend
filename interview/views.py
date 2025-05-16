@@ -29,7 +29,8 @@ env_path = Path(__file__).resolve().parent.parent / '.env'
 load_dotenv(dotenv_path=env_path)
 # print(huggingface_hub._version_)
 # Initialize the inference client
-client = Groq(api_key=os.getenv('GROQ_API_KEY'))
+# client = Groq(api_key=os.getenv('GROQ_API_KEY'))
+client=Groq(api_key="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")
 
 # job = "Python programmer"
 # Skills="Object oriented programming, functions, and Data structures"
@@ -690,98 +691,55 @@ def verify_interview_frames(candidate_id, job_id):
 from django.conf import settings
 
 def confidence_prediction(candidate_id, job_id):
-    """
-    Call confidence prediction endpoint for all frames
-    """
-    # try:
-        # Import required modules
-    import json
-    import traceback
-    import requests
-    from django.conf import settings
-    import re
-    
-    # Get interview details
-    interview_details = get_interview_details(job_id, candidate_id)
-    if not interview_details:
-        print("No interview details found")
-        return None
-    print("interview_details", interview_details)    
-    
-    # Check if frames exist
-    frames = interview_details.get('interview_frames', [])
-    if not frames:
-        print("No frames found in interview details")
-        return None
-    print("Number of frames found:", len(frames))
-    base_url = os.getenv("BASE_URL")
-    confidence_url = f"{base_url}/api/confidence_prediction/analyze-confidence/"
-    print("confidence_url", confidence_url)
-    
-    frame_data = []
-    for frame in frames:
-        # Fix potential issues with URL format
-        url = frame.get("url", "")
-        
-        # Clean up the URL - ensure it doesn't have trailing characters
-        url = url.rstrip("';")
-        
-        # Check if it's a Cloudinary URL (direct URL)
-        if 'cloudinary.com' in url:
-            full_url = url
-        else:
-            # For local URLs, construct full URL
-            domain = settings.BASE_URL.rstrip('/')
-            relative_url = url.lstrip('/')
-            full_url = f"{domain}/{relative_url}"
-        
-        frame_data.append({"url": full_url})
-    
-    # Prepare data
-    confidence_data = {
-        "frames": frame_data
-    }
-    
-    print(f"Sending request with {len(frame_data)} frames")
-    
-    # Call confidence prediction endpoint
-    # try:
-    response = requests.post(
-        confidence_url,
-        json=confidence_data,  # Use json parameter instead of data
-        headers={'Content-Type': 'application/json'},
-        timeout=120  # Increased timeout for multiple frames
-    )
-    print("Response status:", response.text)
-    
-    # Check for 4xx/5xx errors and print response content
-    if response.status_code >= 400:
-        print(f"Error response content: {response.text}")
-    # except requests.exceptions.RequestException as e:
-    #     print(f"Request exception: {str(e)}")
-    #     traceback.print_exc()
-    #     return None
-    
-    print(f"Confidence prediction response status: {response.status_code}")
-    print("response in json",response.json())
-    if response.status_code == 200:
-        try:
-            result = response.json()
-            print(f"Confidence prediction response....: {result}")
-            return result
-        except json.JSONDecodeError as e:
-            print(f"Failed to parse response as JSON....: {str(e)}")
-            print(f"Response content: {response.text}")
+    try:
+        import json, traceback, requests, re, os
+        from django.conf import settings
+
+        interview_details = get_interview_details(job_id, candidate_id)
+        if not interview_details:
+            print("No interview details found")
             return None
-    else:
-        print(f"Confidence prediction failed with status {response.status_code}")
-        print(f"Response content....: {response.text}")
+
+        frames = interview_details.get('interview_frames', [])
+        if not frames:
+            print("No frames found in interview details")
+            return None
+
+        base_url = os.getenv("BASE_URL")
+        confidence_url = f"{base_url}/api/confidence_prediction/analyze-confidence/"
+        print(f"Confidence endpoint: {confidence_url}")
+
+        frame_data = []
+        for frame in frames:
+            url = frame.get("url", "").rstrip("';\"")  # Clean trailing chars
+            if 'cloudinary.com' in url:
+                full_url = url
+            else:
+                domain = settings.BASE_URL.rstrip('/')
+                relative_url = url.lstrip('/')
+                full_url = f"{domain}/{relative_url}"
+            frame_data.append({"url": full_url})
+
+        confidence_data = {"frames": frame_data}
+        print(f"Sending {len(frame_data)} frames...")
+
+        response = requests.post(confidence_url, json=confidence_data, timeout=120)
+
+        if response.status_code == 200:
+            try:
+                return response.json()
+            except json.JSONDecodeError:
+                print("Invalid JSON in response")
+                return None
+        else:
+            print(f"Confidence prediction failed: {response.status_code}")
+            print(f"Response: {response.text}")
+            return None
+
+    except Exception as e:
+        print(f"Exception in confidence_prediction: {e}")
+        traceback.print_exc()
         return None
-        
-    # except Exception as e:
-    #     print(f"Error in confidence prediction....: {str(e)}")
-    #     traceback.print_exc()
-    #     return None
 
 import tempfile
 

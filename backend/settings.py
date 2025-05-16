@@ -31,9 +31,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-secret-key')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 PORT = os.environ.get('PORT', '8000')
-BASE_URL=os.environ.get('BASE_URL', 'http://localhost:8000')
+BASE_URL=os.environ.get('BASE_URL', 'http://127.0.0.1:8000/')
 ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
@@ -106,6 +106,7 @@ AUTHENTICATION_BACKENDS = (
 # CORS settings
 CORS_ALLOWED_ORIGINS = [
     "https://talent-scout-flax.vercel.app",
+    "http://localhost:5173"
 ]
 
 
@@ -226,6 +227,8 @@ elif all([os.getenv("DB_NAME"), os.getenv("DB_USER"), os.getenv("DB_PASSWORD"), 
     DATABASES = {'default': DEFAULT_DB}
 # Fall back to SQLite if nothing else is configured
 else:
+    print("Using SQLite for development")
+    print("No DATABASE_URL or individual DB settings found. Using SQLite.")
     DATABASES = {'default': SQLITE_DB}
 
 # For debugging database connection issues
@@ -369,10 +372,11 @@ CSRF_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SECURE = False    # Set to True in production
 
 from datetime import timedelta
-CSRF_TRUSTED_ORIGINS = ['https://interview-backend-production-bdf0.up.railway.app', "https://talent-scout-flax.vercel.app"]  
+CSRF_TRUSTED_ORIGINS = ['https://interview-backend-production-bdf0.up.railway.app', "https://talent-scout-flax.vercel.app","http://localhost:5173"]  
 CORS_ALLOW_CREDENTIALS = True
 CORS_ORIGIN_WHITELIST = [
     'https://talent-scout-flax.vercel.app'
+    'http://localhost:5173',
 ]
 
 # Your other imports and settings...
