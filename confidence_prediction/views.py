@@ -386,7 +386,7 @@ class ConfidencePredictor:
         try:
             # Initialize the Hugging Face client
             self.api_token = os.getenv("HF_API_TOKEN")
-            print("Hugging Face API token retrieved:", self.api_token[:4] + "..." if self.api_token else None)
+            print("Hugging Face API token:", "Found" if self.api_token else "Not found")
             
             # Add error handling and retry logic for client initialization
             max_retries = 3
@@ -397,7 +397,7 @@ class ConfidencePredictor:
                     self.client = Client(
                         "bairi56/confidence-measure-model",
                         hf_token=self.api_token,
-                        timeout=60  # Increase timeout to 60 seconds
+                        timeout=120  # Increase timeout to 120 seconds
                     )
                     print("Hugging Face client initialized successfully")
                     break
@@ -424,10 +424,31 @@ class ConfidencePredictor:
             clean_url = image_url.rstrip("';")
             print(f"Cleaned URL: {clean_url}")
             
-            # Download image from URL
+            # Download image from URL with proper error handling
             try:
-                response = requests.get(clean_url, timeout=30)  # Add timeout
-                response.raise_for_status()  # Raise exception for non-200 responses
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                }
+                
+                # For Cloudinary URLs, ensure we're getting the raw image
+                if 'cloudinary.com' in clean_url:
+                    # Make sure we're getting an image format
+                    if not any(ext in clean_url.lower() for ext in ['.jpg', '.jpeg', '.png']):
+                        # If no format is specified, append .jpg
+                        if '?' in clean_url:
+                            clean_url = clean_url.split('?')[0] + '.jpg?' + clean_url.split('?')[1]
+                        else:
+                            clean_url = clean_url + '.jpg'
+                
+                response = requests.get(clean_url, headers=headers, timeout=60)
+                response.raise_for_status()
+                
+                # Check if we got an image
+                content_type = response.headers.get('Content-Type', '')
+                if not content_type.startswith('image/'):
+                    print(f"Warning: Content type is not an image: {content_type}")
+                    print(f"First 100 bytes of response: {response.content[:100]}")
+                    
             except requests.exceptions.RequestException as e:
                 print(f"Failed to download image: {str(e)}")
                 print(f"URL attempted: {clean_url}")
@@ -447,6 +468,12 @@ class ConfidencePredictor:
                     img = Image.open(temp_path)
                     img_size = img.size
                     print(f"Image verified: {img_size[0]}x{img_size[1]}")
+                    
+                    # Save the image in a format that's definitely compatible
+                    img = img.convert('RGB')  # Convert to RGB to ensure compatibility
+                    img.save(temp_path, 'JPEG')
+                    print("Image converted to JPEG format")
+                    
                 except Exception as e:
                     print(f"Warning: Could not verify image with PIL: {str(e)}")
                 
@@ -491,7 +518,7 @@ class ConfidencePredictor:
                     
         except Exception as e:
             print(f"Error processing image: {str(e)}")
-            traceback.print_exc()  # Print the full traceback for better debugging
+            traceback.print_exc()
             return None
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
@@ -499,15 +526,12 @@ import json
 @api_view(['POST'])
 @permission_classes([AllowAny])  # Require authentication
 def analyze_confidence(request):
+    """
+    Endpoint to analyze confidence based on image frames
+    """
     try:
         # Debug the incoming request data
         print("Request data type:", type(request.data))
-        print("Raw request body:", request.body.decode('utf-8') if hasattr(request, 'body') else "No raw body")
-        
-        try:
-            print("Request data:", json.dumps(request.data))
-        except:
-            print("Request data (could not be JSON serialized):", request.data)
         
         # Extract frames data, handling potential parsing issues
         frames = []
@@ -521,6 +545,12 @@ def analyze_confidence(request):
                 print(f"Failed to parse request data as JSON: {str(e)}")
                 return Response({'error': 'Invalid JSON data'}, status=400)
         
+        # Print the actual data for debugging
+        try:
+            print("Request data content:", json.dumps(request.data))
+        except:
+            print("Request data (could not be JSON serialized):", request.data)
+            
         if not frames:
             print("No frames provided in request")
             return Response({'error': 'No frames provided'}, status=400)

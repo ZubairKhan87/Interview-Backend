@@ -712,7 +712,7 @@ def confidence_prediction(candidate_id, job_id):
         if not frames:
             print("No frames found in interview details")
             return None
-        print("frames", frames)
+        print("Number of frames found:", len(frames))
         
         confidence_url = f"{settings.BASE_URL}/api/confidence_prediction/analyze-confidence/"
         print("confidence_url", confidence_url)
@@ -741,24 +741,17 @@ def confidence_prediction(candidate_id, job_id):
             "frames": frame_data
         }
         
-        # Convert to JSON string explicitly to ensure proper formatting
-        json_data = json.dumps(confidence_data)
-        print("confidence_data", json_data)
-        
-        print("Sending request with frame URLs:")
-        for frame in frame_data:
-            print(f"Frame URL: {frame['url']}")
+        print(f"Sending request with {len(frame_data)} frames")
         
         # Call confidence prediction endpoint
         try:
             response = requests.post(
                 confidence_url,
-                data=json_data,  # Use data instead of json to send the pre-formatted JSON string
+                json=confidence_data,  # Use json parameter instead of data
                 headers={'Content-Type': 'application/json'},
-                timeout=60  # Add a timeout
+                timeout=120  # Increased timeout for multiple frames
             )
             print("Response status:", response.status_code)
-            print("Response headers:", response.headers)
             
             # Check for 4xx/5xx errors and print response content
             if response.status_code >= 400:
@@ -768,7 +761,6 @@ def confidence_prediction(candidate_id, job_id):
             traceback.print_exc()
             return None
         
-        print("response", response)
         print(f"Confidence prediction response status: {response.status_code}")
         
         if response.status_code == 200:
@@ -789,8 +781,6 @@ def confidence_prediction(candidate_id, job_id):
         print(f"Error in confidence prediction: {str(e)}")
         traceback.print_exc()
         return None
-
-
 
 import tempfile
 
