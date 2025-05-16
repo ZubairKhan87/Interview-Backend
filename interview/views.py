@@ -707,14 +707,20 @@ def confidence_prediction(candidate_id, job_id):
         print("frames", frames)
         confidence_url = f"{settings.BASE_URL}/api/confidence_prediction/analyze-confidence/"
         print("confidence_url", confidence_url)
-        # Construct full URLs for frames
-        domain = settings.BASE_URL.rstrip('/')  # Remove trailing slash if present
-        print("domain", domain)
+        
         frame_data = []
         for frame in frames:
-            # Get relative URL and ensure it starts with a single forward slash
-            relative_url = frame["url"].lstrip('/')
-            full_url = f"{domain}/{relative_url}"
+            # For cloudinary URLs, use them directly without prepending domain
+            if 'cloudinary.com' in frame["url"]:
+                full_url = frame["url"]
+            else:
+                # For local URLs, construct full URL
+                # Remove trailing slash from domain if present
+                domain = settings.BASE_URL.rstrip('/')
+                # Remove leading slash from relative URL if present
+                relative_url = frame["url"].lstrip('/')
+                full_url = f"{domain}/{relative_url}"
+            
             frame_data.append({"url": full_url})
         
         # Prepare data
@@ -723,17 +729,18 @@ def confidence_prediction(candidate_id, job_id):
         }
         print("confidence_data", confidence_data)
         print(f"Sending request with frame URLs:")
-        # for frame in frame_data:
-        #     print(f"Frame URL: {frame['url']}")
+        for frame in frame_data:
+            print(f"Frame URL: {frame['url']}")
         
         # Call confidence prediction endpoint
         response = requests.post(
             confidence_url,
             json=confidence_data,
+            headers={'Content-Type': 'application/json'}
         )
         print("response", response)
         
-        # print(f"Confidence prediction response status: {response.status_code}")
+        print(f"Confidence prediction response status: {response.status_code}")
         
         if response.status_code == 200:
             result = response.json()

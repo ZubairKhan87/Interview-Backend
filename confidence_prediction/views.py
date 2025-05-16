@@ -379,32 +379,39 @@ class FaceVerificationCheat(APIView):
 
 import time
 
-
+import traceback
 # confidence_prediction/views.py
 class ConfidencePredictor:
     def __init__(self):
         # Initialize the Hugging Face client
-        self.api_token = "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"
-        print("Hugging Face client initialized successfully",self.api_token)
+        self.api_token = os.getenv("HF_API_TOKEN")
+        print("Hugging Face client initialized successfully", self.api_token)
         self.client = Client(
             "bairi56/confidence-measure-model",
             hf_token=self.api_token
         )
-
-        print("Hugging Face client initialized successfully",self.client)
+        print("Hugging Face client initialized successfully", self.client)
+        
     def process_image_url(self, image_url):
         try:
+            print(f"Processing image URL: {image_url}")
+            # Handle malformed URLs by removing any trailing characters
+            image_url = image_url.rstrip("';")
+            
             # Download image from URL
             response = requests.get(image_url)
             if response.status_code != 200:
                 print(f"Failed to download image: {response.status_code}")
+                print(f"URL attempted: {image_url}")
                 return None
-            print("Image downloaded successfully",response)
+                
+            print("Image downloaded successfully", response)
             # Create a temporary file to store the image
             with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
                 temp_file.write(response.content)
                 temp_path = temp_file.name
-                print("Temporary file created successfully",temp_path)
+                print("Temporary file created successfully", temp_path)
+                
             try:
                 # Make prediction using the Hugging Face model
                 result = self.client.predict(
@@ -414,7 +421,7 @@ class ConfidencePredictor:
                 
                 print("Result from Hugging Face model:", result)
                 
-                # Process the result based on  model's output format
+                # Process the result based on model's output format
                 if isinstance(result, str):
                     # Try to extract the confidence value from the string using regex
                     match = re.search(r"Confidence:\s*([\d.]+)%", result)
@@ -442,6 +449,7 @@ class ConfidencePredictor:
                     
         except Exception as e:
             print(f"Error processing image: {e}")
+            traceback.print_exc()  # Print the full traceback for better debugging
             return None
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
@@ -449,10 +457,16 @@ from rest_framework.decorators import api_view, permission_classes
 @permission_classes([AllowAny])  # Require authentication
 def analyze_confidence(request):
     try:
+        # Debug the incoming request data
+        print("Request data type:", type(request.data))
+        print("Request data:", request.data)
+        
         frames = request.data.get('frames', [])
         if not frames:
             return Response({'error': 'No frames provided'}, status=400)
-        print("frames in analyze confidence",frames)
+            
+        print("frames in analyze confidence", frames)
+        
         # Use the new HuggingFace-based predictor
         predictor = ConfidencePredictor()
         confidence_scores = []
@@ -460,14 +474,13 @@ def analyze_confidence(request):
         # Process each frame
         for frame in frames:
             frame_url = frame.get('url')
-            print("frame_url in analyze function...",frame_url)
+            print("frame_url in analyze function...", frame_url)
             score = predictor.process_image_url(frame_url)
             if score is not None:
                 confidence_scores.append(score)
-                print("Confidence Scores of frame :", score)
-            print("Confidence Scores of frame :", confidence_scores)
-            # else:
-            #     print(f"Failed to process frame: {frame_url}")
+                print("Confidence Score of frame:", score)
+            print("Confidence Scores so far:", confidence_scores)
+        
         if not confidence_scores:
             return Response({'error': 'No valid predictions'}, status=400)
         
@@ -480,4 +493,5 @@ def analyze_confidence(request):
         })
         
     except Exception as e:
+        traceback.print_exc()  # Print the full traceback for better debugging
         return Response({'error': str(e)}, status=500)
