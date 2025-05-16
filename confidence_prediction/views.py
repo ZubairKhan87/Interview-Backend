@@ -524,6 +524,24 @@ from rest_framework.decorators import api_view, permission_classes
 import json
 @api_view(['POST'])
 @permission_classes([AllowAny])  # Require authentication
+def clean_url(url):
+    """
+    Clean the URL by removing surrounding quotes or trailing characters.
+    """
+    cleaned = url.strip().strip('\'"')
+    return cleaned
+
+def is_url_valid(url):
+    """
+    Check if the URL is reachable (returns HTTP 200).
+    """
+    try:
+        response = requests.head(url, timeout=5)
+        return response.status_code == 200
+    except requests.RequestException as e:
+        print(f"URL check failed: {url}, Error: {str(e)}")
+        return False
+
 def analyze_confidence(request):
     """
     Endpoint to analyze confidence based on image frames
@@ -531,8 +549,8 @@ def analyze_confidence(request):
     try:
         # Debug the incoming request data
         print("Request data type:", type(request.data))
-        
-        # Extract frames data, handling potential parsing issues
+
+        # Parse the request data
         frames = []
         if isinstance(request.data, dict):
             frames = request.data.get('frames', [])
@@ -543,59 +561,64 @@ def analyze_confidence(request):
             except json.JSONDecodeError as e:
                 print(f"Failed to parse request data as JSON: {str(e)}")
                 return Response({'error': 'Invalid JSON data'}, status=400)
-        
-        # Print the actual data for debugging
+
+        # Print raw request data
         try:
             print("Request data content:", json.dumps(request.data))
         except:
             print("Request data (could not be JSON serialized):", request.data)
-            
+
         if not frames:
             print("No frames provided in request")
             return Response({'error': 'No frames provided'}, status=400)
-            
-        print("Frames in analyze confidence:", frames)
-        
-        # Fix malformed URLs in frame data if needed
+
+        print(f"Received {len(frames)} frames")
+
+        # Clean and validate URLs
         for frame in frames:
             if isinstance(frame, dict) and 'url' in frame:
-                frame['url'] = frame['url'].rstrip("';")
-        
-        # Use the HuggingFace-based predictor
+                original_url = frame['url']
+                cleaned_url = clean_url(original_url)
+                print(f"Original URL: {original_url}")
+                print(f"Cleaned URL: {cleaned_url}")
+                if not is_url_valid(cleaned_url):
+                    print(f"Invalid or unreachable URL: {cleaned_url}")
+                    continue
+                frame['url'] = cleaned_url
+
+        # Initialize Hugging Face-based predictor
         predictor = ConfidencePredictor()
         if predictor.client is None:
+            print("Failed to initialize predictor client.")
             return Response({'error': 'Failed to initialize confidence predictor'}, status=500)
-            
+
         confidence_scores = []
-        
-        # Process each frame
+
         for frame in frames:
             if not isinstance(frame, dict) or 'url' not in frame:
                 print(f"Invalid frame format: {frame}")
                 continue
-                
+
             frame_url = frame.get('url')
             print(f"Processing frame URL: {frame_url}")
-            
             score = predictor.process_image_url(frame_url)
             if score is not None:
                 confidence_scores.append(score)
-                print(f"Confidence Score of frame: {score}")
-            
-            print(f"Confidence Scores so far: {confidence_scores}")
-        
+                print(f"Confidence Score for frame: {score}")
+            else:
+                print(f"Failed to get score for frame: {frame_url}")
+
+        print(f"All scores: {confidence_scores}")
+
         if not confidence_scores:
             return Response({'error': 'No valid predictions'}, status=400)
-        
-        # Calculate the average score
+
         final_score = sum(confidence_scores) / len(confidence_scores)
-        print(f"Average Score: {final_score:.2f} out of 100")
-        
-        return Response({
-            'final_score': final_score
-        })
-        
+        print(f"Average confidence score: {final_score:.2f}")
+
+        return Response({'final_score': final_score})
+
     except Exception as e:
         print(f"Error in analyze_confidence: {str(e)}")
-        traceback.print_exc()  # Print the full traceback for better debugging
+        traceback.print_exc()
         return Response({'error': str(e)}, status=500)
