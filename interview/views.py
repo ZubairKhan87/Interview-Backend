@@ -751,7 +751,7 @@ def confidence_prediction(candidate_id, job_id):
                 headers={'Content-Type': 'application/json'},
                 timeout=120  # Increased timeout for multiple frames
             )
-            print("Response status:", response.status_code)
+            print("Response status:", response.text)
             
             # Check for 4xx/5xx errors and print response content
             if response.status_code >= 400:
@@ -762,23 +762,23 @@ def confidence_prediction(candidate_id, job_id):
             return None
         
         print(f"Confidence prediction response status: {response.status_code}")
-        
+        print("response in json",response.json())
         if response.status_code == 200:
             try:
                 result = response.json()
-                print(f"Confidence prediction response: {result}")
+                print(f"Confidence prediction response....: {result}")
                 return result
             except json.JSONDecodeError as e:
-                print(f"Failed to parse response as JSON: {str(e)}")
+                print(f"Failed to parse response as JSON....: {str(e)}")
                 print(f"Response content: {response.text}")
                 return None
         else:
             print(f"Confidence prediction failed with status {response.status_code}")
-            print(f"Response content: {response.text}")
+            print(f"Response content....: {response.text}")
             return None
         
     except Exception as e:
-        print(f"Error in confidence prediction: {str(e)}")
+        print(f"Error in confidence prediction....: {str(e)}")
         traceback.print_exc()
         return None
 
