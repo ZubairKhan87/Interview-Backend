@@ -611,7 +611,8 @@ def save_frame(request):
             'success': False,
             'error': str(e)
         }, status=500)
-# views.py in your candidates app
+
+
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -685,81 +686,67 @@ def verify_interview_frames(candidate_id, job_id):
         logger.error(f"Error in frame verification: {e}")
         return None
     
-import json
+
 from django.conf import settings
 def confidence_prediction(candidate_id, job_id):
     """
     Call confidence prediction endpoint for all frames
     """
     try:
-        from django.conf import settings
         # Get interview details
         interview_details = get_interview_details(job_id, candidate_id)
         if not interview_details:
-            logger.warning("No interview details found")
-            return {'final_score': 50.0, 'message': 'No interview details found'}
-            
+            print("No interview details found")
+            return None
+        print("interview_details", interview_details)    
         # Check if frames exist
         frames = interview_details.get('interview_frames', [])
         if not frames:
-            logger.warning("No frames found in interview details")
-            return {'final_score': 50.0, 'message': 'No frames found'}
-
-        logger.info(f"Found {len(frames)} frames for job_id={job_id}, candidate_id={candidate_id}")
-        
+            print("No frames found in interview details")
+            return None
+        print("frames", frames)
         confidence_url = f"{settings.BASE_URL}/api/confidence_prediction/analyze-confidence/"
-        
-        # Construct frame data with original Cloudinary URLs
+        print("confidence_url", confidence_url)
+        # Construct full URLs for frames
+        domain = settings.BASE_URL.rstrip('/')  # Remove trailing slash if present
+        print("domain", domain)
         frame_data = []
         for frame in frames:
-            frame_url = frame.get("url")
-            if not frame_url:
-                logger.warning(f"Frame has no URL: {frame}")
-                continue
-                
-            frame_data.append({"url": frame_url})
+            # Get relative URL and ensure it starts with a single forward slash
+            relative_url = frame["url"].lstrip('/')
+            full_url = f"{domain}/{relative_url}"
+            frame_data.append({"url": full_url})
         
         # Prepare data
         confidence_data = {
             "frames": frame_data
         }
+        print("confidence_data", confidence_data)
+        print(f"Sending request with frame URLs:")
+        # for frame in frame_data:
+        #     print(f"Frame URL: {frame['url']}")
         
-        logger.info(f"Sending request to {confidence_url} with {len(frame_data)} frames")
-        
-        # Log the actual data being sent
-        logger.debug(f"Request payload: {json.dumps(confidence_data)}")
-        
-        # Call confidence prediction endpoint with increased timeout
+        # Call confidence prediction endpoint
         response = requests.post(
             confidence_url,
             json=confidence_data,
-            headers={'Content-Type': 'application/json'},
-            timeout=120  # Increased timeout for processing multiple frames
         )
+        print("response", response)
         
-        logger.info(f"Confidence prediction response status: {response.status_code}")
+        # print(f"Confidence prediction response status: {response.status_code}")
         
         if response.status_code == 200:
-            try:
-                result = response.json()
-                logger.info(f"Confidence prediction response: {result}")
-                return result
-            except ValueError as e:
-                logger.error(f"Failed to parse JSON response: {e}")
-                logger.error(f"Response content: {response.text}")
-                # Return a default value instead of None
-                return {'final_score': 50.0, 'message': 'Error parsing response'}
+            result = response.json()
+            print(f"Confidence prediction response: {result}")
+            return result
         else:
-            logger.error(f"Confidence prediction failed with status {response.status_code}")
-            logger.error(f"Response content: {response.text}")
-            # Return a default value instead of None
-            return {'final_score': 50.0, 'message': f'Failed with status {response.status_code}'}
+            print(f"Confidence prediction failed with status {response.status_code}")
+            print(f"Response content: {response.text}")
+            return None
         
     except Exception as e:
-        logger.error(f"Error in confidence prediction: {e}", exc_info=True)
-        # Return a default value instead of None
-        return {'final_score': 50.0, 'message': f'Error occurred: {str(e)}'}
-
+        print(f"Error in confidence prediction: {str(e)}")
+        return None
 
 
 

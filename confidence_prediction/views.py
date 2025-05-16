@@ -379,222 +379,105 @@ class FaceVerificationCheat(APIView):
 
 import time
 
-import json
-from huggingface_hub import InferenceClient
-# confidence_prediction/views.py
-def handle_file(file_path):
-    # This function should return the file in a format acceptable by the HF model
-    # Ensure the file exists
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"File not found: {file_path}")
-    return open(file_path, "rb")
 
+# confidence_prediction/views.py
 class ConfidencePredictor:
     def __init__(self):
-        # Initialize the Hugging Face Inference client instead of the regular Client
-        self.api_token = os.getenv("HF_API_TOKEN")
-        if not self.api_token:
-            logger.warning("HF_API_TOKEN environment variable not set")
-        
-        # Use the InferenceClient instead of Client for more reliable API calls
-        self.client = InferenceClient(
-            model="bairi56/confidence-measure-model",
-            token=self.api_token
+        # Initialize the Hugging Face client
+        self.api_token = "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"
+        print("Hugging Face client initialized successfully",self.api_token)
+        self.client = Client(
+            "bairi56/confidence-measure-model",
+            hf_token=self.api_token
         )
-        logger.info("ConfidencePredictor initialized with InferenceClient")
 
+        print("Hugging Face client initialized successfully",self.client)
     def process_image_url(self, image_url):
         try:
-            logger.info(f"Processing image URL: {image_url}")
-            # Download image from URL with proper headers and timeout
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
-            response = requests.get(image_url, headers=headers, timeout=30)
-            
+            # Download image from URL
+            response = requests.get(image_url)
             if response.status_code != 200:
-                logger.error(f"Failed to download image: {response.status_code}, URL: {image_url}")
+                print(f"Failed to download image: {response.status_code}")
                 return None
-            
+            print("Image downloaded successfully",response)
             # Create a temporary file to store the image
             with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
                 temp_file.write(response.content)
                 temp_path = temp_file.name
-                logger.info(f"Image saved to temporary file: {temp_path}")
-
+                print("Temporary file created successfully",temp_path)
             try:
-                # Verify the file exists and has content
-                if os.path.getsize(temp_path) == 0:
-                    logger.error("Downloaded image file is empty")
-                    return None
+                # Make prediction using the Hugging Face model
+                result = self.client.predict(
+                    image=handle_file(temp_path),
+                    api_name="/predict"
+                )
                 
-                # Make prediction using the InferenceClient
-                logger.info("Sending request to Hugging Face model")
+                print("Result from Hugging Face model:", result)
                 
-                # Read the image file
-                with open(temp_path, "rb") as f:
-                    image_data = f.read()
-                
-                # Multiple retry attempts in case of API issues
-                max_retries = 3
-                retry_delay = 2  # seconds
-                
-                for attempt in range(max_retries):
-                    try:
-                        # Use the text-generation task instead of predict
-                        result = self.client.post(
-                            json={"image": image_data},
-                            data=image_data,  # Try with data parameter if needed
-                            timeout=30
-                        )
-                        logger.info(f"Raw model result: {result}")
-                        break
-                    except Exception as e:
-                        logger.warning(f"Attempt {attempt+1}/{max_retries} failed: {str(e)}")
-                        if attempt < max_retries - 1:
-                            time.sleep(retry_delay)
-                        else:
-                            logger.error(f"All {max_retries} attempts failed")
-                            raise
-                
-                # Fallback to direct API call if the client doesn't work
-                if not result:
-                    logger.info("Attempting direct API call as fallback")
-                    api_url = "https://huggingface.co/spaces/bairi56/confidence-measure-model"
-                    headers = {"Authorization": f"Bearer {self.api_token}"}
-                    
-                    with open(temp_path, "rb") as f:
-                        response = requests.post(
-                            api_url,
-                            headers=headers,
-                            files={"image": f},
-                            timeout=30
-                        )
-                        
-                    if response.status_code == 200:
-                        result = response.json()
-                        logger.info(f"Direct API result: {result}")
-                    else:
-                        logger.error(f"Direct API call failed: {response.status_code}, {response.text}")
-                        return None
-                
-                # Process the result based on model's output format
+                # Process the result based on  model's output format
                 if isinstance(result, str):
                     # Try to extract the confidence value from the string using regex
                     match = re.search(r"Confidence:\s*([\d.]+)%", result)
                     if match:
                         confidence_percentage = float(match.group(1))
-                        logger.info(f"Extracted confidence: {confidence_percentage}%")
                         return round(confidence_percentage, 2)
                     else:
-                        logger.warning(f"Could not extract confidence value from: {result}")
-                        # Default confidence if needed
-                        return 50.0
-                
-                elif isinstance(result, dict):
-                    # Check if the result is a dictionary with confidence info
-                    if "confidence" in result:
-                        confidence_value = result["confidence"]
-                        logger.info(f"Got confidence from dict: {confidence_value}")
-                        if 0 <= confidence_value <= 1:
-                            return round(confidence_value * 100, 2)
-                        return round(confidence_value, 2)
-                
+                        print(f"Could not extract confidence value from: {result}")
+                        return None
+
                 elif isinstance(result, (list, tuple)) and len(result) > 0:
                     confidence_value = result[0]
                     if isinstance(confidence_value, (int, float)):
-                        logger.info(f"Got numeric confidence value: {confidence_value}")
                         if 0 <= confidence_value <= 1:
                             return round(confidence_value * 100, 2)
                         return round(confidence_value, 2)
-                    
-                # Fallback to a default confidence value if unable to process
-                logger.warning("Using default confidence value as fallback")
-                return 50.0
+                else:
+                    print(f"Unexpected result format: {result}")
+                    return None
                 
             finally:
                 # Clean up the temporary file
                 if os.path.exists(temp_path):
                     os.unlink(temp_path)
-                    logger.info(f"Temporary file removed: {temp_path}")
                     
         except Exception as e:
-            logger.error(f"Error processing image: {e}", exc_info=True)
-            # Return a default value instead of None to avoid breaking the workflow
-            return 50.0
+            print(f"Error processing image: {e}")
+            return None
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
 @api_view(['POST'])
 @permission_classes([AllowAny])  # Require authentication
 def analyze_confidence(request):
     try:
-        # Log the raw request data for debugging
-        logger.info(f"Request data: {request.data}")
-        
         frames = request.data.get('frames', [])
         if not frames:
-            logger.warning("No frames provided in request")
             return Response({'error': 'No frames provided'}, status=400)
-
-        logger.info(f"Received {len(frames)} frames for confidence analysis")
-        
-        # Use the updated HuggingFace-based predictor
+        print("frames in analyze confidence",frames)
+        # Use the new HuggingFace-based predictor
         predictor = ConfidencePredictor()
         confidence_scores = []
         
         # Process each frame
-        for i, frame in enumerate(frames):
+        for frame in frames:
             frame_url = frame.get('url')
-            logger.info(f"Processing frame {i+1}/{len(frames)}: {frame_url}")
-            
-            if not frame_url:
-                logger.warning(f"Frame {i+1} has no URL")
-                continue
-                
-            # Add retry logic for each frame
-            max_retries = 3
-            retry_delay = 2  # seconds
-            score = None
-            
-            for attempt in range(max_retries):
-                try:
-                    score = predictor.process_image_url(frame_url)
-                    if score is not None:
-                        logger.info(f"Frame {i+1} confidence score: {score}")
-                        break
-                    logger.warning(f"Frame {i+1} returned no confidence score, attempt {attempt+1}/{max_retries}")
-                except Exception as e:
-                    logger.warning(f"Error processing frame {i+1}, attempt {attempt+1}/{max_retries}: {e}")
-                    if attempt < max_retries - 1:
-                        time.sleep(retry_delay)
-            
+            print("frame_url in analyze function...",frame_url)
+            score = predictor.process_image_url(frame_url)
             if score is not None:
                 confidence_scores.append(score)
-        
+                print("Confidence Scores of frame :", score)
+            print("Confidence Scores of frame :", confidence_scores)
+            # else:
+            #     print(f"Failed to process frame: {frame_url}")
         if not confidence_scores:
-            logger.warning("No valid predictions obtained from any frames")
-            # Return a default score instead of an error to keep the workflow going
-            return Response({
-                'final_score': 50.0,
-                'message': 'Using default confidence score due to processing issues',
-                'success': True
-            })
+            return Response({'error': 'No valid predictions'}, status=400)
         
         # Calculate the average score
         final_score = sum(confidence_scores) / len(confidence_scores)
-        logger.info(f"Final average confidence score: {final_score:.2f}")
 
+        print(f"Average Score: {final_score:.2f} out of 100")
         return Response({
-            'final_score': final_score,
-            'individual_scores': confidence_scores,
-            'success': True
+            'final_score': final_score
         })
         
     except Exception as e:
-        logger.error(f"Error in analyze_confidence: {e}", exc_info=True)
-        # Return a default value instead of an error to keep the workflow going
-        return Response({
-            'final_score': 50.0,
-            'message': f'Error occurred but using default confidence score: {str(e)}',
-            'success': True
-        })
+        return Response({'error': str(e)}, status=500)
