@@ -541,7 +541,9 @@ def is_url_valid(url):
     except requests.RequestException as e:
         print(f"URL check failed: {url}, Error: {str(e)}")
         return False
-
+@csrf_exempt
+@permission_classes([AllowAny])  # Allow any user to access this endpoint
+@api_view(['POST'])  # or ['GET', 'POST'] depending on your use
 def analyze_confidence(request):
     """
     Endpoint to analyze confidence based on image frames
