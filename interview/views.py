@@ -693,32 +693,45 @@ def confidence_prediction(candidate_id, job_id):
     Call confidence prediction endpoint for all frames
     """
     try:
+        # Import required modules
+        import json
+        import traceback
+        import requests
+        from django.conf import settings
+        import re
+        
         # Get interview details
         interview_details = get_interview_details(job_id, candidate_id)
         if not interview_details:
             print("No interview details found")
             return None
         print("interview_details", interview_details)    
+        
         # Check if frames exist
         frames = interview_details.get('interview_frames', [])
         if not frames:
             print("No frames found in interview details")
             return None
         print("frames", frames)
+        
         confidence_url = f"{settings.BASE_URL}/api/confidence_prediction/analyze-confidence/"
         print("confidence_url", confidence_url)
         
         frame_data = []
         for frame in frames:
-            # For cloudinary URLs, use them directly without prepending domain
-            if 'cloudinary.com' in frame["url"]:
-                full_url = frame["url"]
+            # Fix potential issues with URL format
+            url = frame.get("url", "")
+            
+            # Clean up the URL - ensure it doesn't have trailing characters
+            url = url.rstrip("';")
+            
+            # Check if it's a Cloudinary URL (direct URL)
+            if 'cloudinary.com' in url:
+                full_url = url
             else:
                 # For local URLs, construct full URL
-                # Remove trailing slash from domain if present
                 domain = settings.BASE_URL.rstrip('/')
-                # Remove leading slash from relative URL if present
-                relative_url = frame["url"].lstrip('/')
+                relative_url = url.lstrip('/')
                 full_url = f"{domain}/{relative_url}"
             
             frame_data.append({"url": full_url})
@@ -727,25 +740,46 @@ def confidence_prediction(candidate_id, job_id):
         confidence_data = {
             "frames": frame_data
         }
-        print("confidence_data", confidence_data)
-        print(f"Sending request with frame URLs:")
+        
+        # Convert to JSON string explicitly to ensure proper formatting
+        json_data = json.dumps(confidence_data)
+        print("confidence_data", json_data)
+        
+        print("Sending request with frame URLs:")
         for frame in frame_data:
             print(f"Frame URL: {frame['url']}")
         
         # Call confidence prediction endpoint
-        response = requests.post(
-            confidence_url,
-            json=confidence_data,
-            headers={'Content-Type': 'application/json'}
-        )
-        print("response", response)
+        try:
+            response = requests.post(
+                confidence_url,
+                data=json_data,  # Use data instead of json to send the pre-formatted JSON string
+                headers={'Content-Type': 'application/json'},
+                timeout=60  # Add a timeout
+            )
+            print("Response status:", response.status_code)
+            print("Response headers:", response.headers)
+            
+            # Check for 4xx/5xx errors and print response content
+            if response.status_code >= 400:
+                print(f"Error response content: {response.text}")
+        except requests.exceptions.RequestException as e:
+            print(f"Request exception: {str(e)}")
+            traceback.print_exc()
+            return None
         
+        print("response", response)
         print(f"Confidence prediction response status: {response.status_code}")
         
         if response.status_code == 200:
-            result = response.json()
-            print(f"Confidence prediction response: {result}")
-            return result
+            try:
+                result = response.json()
+                print(f"Confidence prediction response: {result}")
+                return result
+            except json.JSONDecodeError as e:
+                print(f"Failed to parse response as JSON: {str(e)}")
+                print(f"Response content: {response.text}")
+                return None
         else:
             print(f"Confidence prediction failed with status {response.status_code}")
             print(f"Response content: {response.text}")
@@ -753,6 +787,7 @@ def confidence_prediction(candidate_id, job_id):
         
     except Exception as e:
         print(f"Error in confidence prediction: {str(e)}")
+        traceback.print_exc()
         return None
 
 
