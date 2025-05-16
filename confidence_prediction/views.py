@@ -397,7 +397,6 @@ class ConfidencePredictor:
                     self.client = Client(
                         "bairi56/confidence-measure-model",
                         hf_token=self.api_token,
-                        timeout=120  # Increase timeout to 120 seconds
                     )
                     print("Hugging Face client initialized successfully")
                     break
