@@ -402,7 +402,7 @@ class ConfidencePredictor:
             print("HF_API_TOKEN not set")
             self.client = None
             return
-        self.client = Client("https://bairi56-confidence-measure-model.hf.space/", hf_token=self.api_token)
+        self.client = Client("bairi56/confidence-measure-model", hf_token=self.api_token)  # Changed to token parameter
         print("client........",self.client)
     def process_image_url(self, image_url):
         try:
