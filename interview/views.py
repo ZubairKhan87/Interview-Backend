@@ -688,6 +688,7 @@ def verify_interview_frames(candidate_id, job_id):
     
 
 from django.conf import settings
+
 def confidence_prediction(candidate_id, job_id):
     """
     Call confidence prediction endpoint for all frames

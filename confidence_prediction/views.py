@@ -471,9 +471,8 @@ def is_url_valid(url):
         print(f"URL check failed: {url}, Error: {str(e)}")
         return False
 @csrf_exempt
-@api_view(['POST']) 
+@api_view(["GET", "POST"])  # Correct
 @permission_classes([AllowAny])  # Require authentication
-
 def analyze_confidence(request):
     """
     Endpoint to analyze confidence based on image frames
