@@ -388,34 +388,24 @@ class ConfidencePredictor:
             self.api_token = os.getenv("HF_API_TOKEN")
             print("Hugging Face API token:", "Found" if self.api_token else "Not found")
             
-            if not self.api_token:
-                print("WARNING: HF_API_TOKEN environment variable is not set")
-                
-            # Add more detailed error handling and robust retry logic
+            # Add error handling and retry logic for client initialization
             max_retries = 3
             retry_count = 0
             
             while retry_count < max_retries:
                 try:
-                    print(f"Attempt {retry_count + 1}/{max_retries} to initialize Hugging Face client")
-                    
-                    # Use more robust timeout settings
                     self.client = Client(
                         "bairi56/confidence-measure-model",
                         hf_token=self.api_token,
-                        verbose=True,  # Enable verbose mode for debugging
                     )
                     print("Hugging Face client initialized successfully")
                     break
                 except Exception as e:
                     retry_count += 1
                     print(f"Attempt {retry_count}/{max_retries} to initialize Hugging Face client failed: {str(e)}")
-                    print(f"Error type: {type(e).__name__}")
-                    traceback.print_exc()
-                    
                     if retry_count >= max_retries:
                         raise
-                    time.sleep(5)  # Increased wait time before retrying
+                    time.sleep(2)  # Wait before retrying
         except Exception as e:
             print(f"Failed to initialize Hugging Face client: {str(e)}")
             traceback.print_exc()
@@ -434,7 +424,6 @@ class ConfidencePredictor:
             print(f"Cleaned URL: {clean_url}")
             
             # Download image from URL with proper error handling
-            temp_path = None
             try:
                 headers = {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -442,33 +431,22 @@ class ConfidencePredictor:
                 
                 # For Cloudinary URLs, ensure we're getting the raw image
                 if 'cloudinary.com' in clean_url:
-                    # Parse the Cloudinary URL to ensure we get a direct image
-                    if '/image/upload/' in clean_url:
-                        # Add quality and format parameters for Cloudinary if they don't exist
-                        if '?' not in clean_url:
-                            clean_url += '?q=90&format=jpg'
-                        elif 'format=' not in clean_url.lower():
-                            clean_url += '&format=jpg'
-                    
-                    print(f"Modified Cloudinary URL: {clean_url}")
+                    # Make sure we're getting an image format
+                    if not any(ext in clean_url.lower() for ext in ['.jpg', '.jpeg', '.png']):
+                        # If no format is specified, append .jpg
+                        if '?' in clean_url:
+                            clean_url = clean_url.split('?')[0] + '.jpg?' + clean_url.split('?')[1]
+                        else:
+                            clean_url = clean_url + '.jpg'
                 
-                # Add detailed download diagnostics
-                print(f"Attempting to download image from: {clean_url}")
                 response = requests.get(clean_url, headers=headers, timeout=60)
                 response.raise_for_status()
                 
-                # Debug the response content type
+                # Check if we got an image
                 content_type = response.headers.get('Content-Type', '')
-                print(f"Response content type: {content_type}")
-                print(f"Response size: {len(response.content)} bytes")
-                
                 if not content_type.startswith('image/'):
                     print(f"Warning: Content type is not an image: {content_type}")
                     print(f"First 100 bytes of response: {response.content[:100]}")
-                    # If website content was returned instead of image, this might help debugging
-                    if content_type.startswith('text/html'):
-                        print(f"HTML response snippet: {response.text[:500]}")
-                    return None
                     
             except requests.exceptions.RequestException as e:
                 print(f"Failed to download image: {str(e)}")
@@ -478,15 +456,10 @@ class ConfidencePredictor:
             print(f"Image downloaded successfully: {response.status_code}, Content length: {len(response.content)}")
             
             # Create a temporary file to store the image
-            try:
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
-                    temp_file.write(response.content)
-                    temp_path = temp_file.name
-                    print(f"Temporary file created successfully: {temp_path}")
-            except Exception as e:
-                print(f"Error creating temporary file: {str(e)}")
-                traceback.print_exc()
-                return None
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
+                temp_file.write(response.content)
+                temp_path = temp_file.name
+                print(f"Temporary file created successfully: {temp_path}")
                 
             try:
                 # Verify the image file
@@ -502,17 +475,10 @@ class ConfidencePredictor:
                     
                 except Exception as e:
                     print(f"Warning: Could not verify image with PIL: {str(e)}")
-                    traceback.print_exc()
-                    return None
                 
                 # Make prediction using the Hugging Face model
                 try:
                     print("Sending image to Hugging Face model...")
-                    
-                    # We need to implement the handle_file function if it's missing
-                    def handle_file(file_path):
-                        return file_path
-                    
                     result = self.client.predict(
                         image=handle_file(temp_path),
                         api_name="/predict"
@@ -545,12 +511,9 @@ class ConfidencePredictor:
                 
             finally:
                 # Clean up the temporary file
-                if temp_path and os.path.exists(temp_path):
-                    try:
-                        os.unlink(temp_path)
-                        print(f"Temporary file removed: {temp_path}")
-                    except Exception as e:
-                        print(f"Error removing temporary file: {str(e)}")
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
+                    print(f"Temporary file removed: {temp_path}")
                     
         except Exception as e:
             print(f"Error processing image: {str(e)}")
@@ -563,7 +526,7 @@ def clean_url(url):
     """
     Clean the URL by removing surrounding quotes or trailing characters.
     """
-    cleaned = url.strip().strip('\'"').rstrip("';")
+    cleaned = url.strip().strip('\'"')
     return cleaned
 
 def is_url_valid(url):
@@ -571,16 +534,15 @@ def is_url_valid(url):
     Check if the URL is reachable (returns HTTP 200).
     """
     try:
-        response = requests.head(url, timeout=10, 
-                                 headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
+        response = requests.head(url, timeout=5)
         return response.status_code == 200
     except requests.RequestException as e:
         print(f"URL check failed: {url}, Error: {str(e)}")
         return False
-
 @csrf_exempt
-@api_view(['POST'])
-@permission_classes([AllowAny])  # Consider using proper authentication in production
+@api_view(['POST']) 
+@permission_classes([AllowAny])  # Require authentication
+
 def analyze_confidence(request):
     """
     Endpoint to analyze confidence based on image frames
@@ -601,46 +563,45 @@ def analyze_confidence(request):
                 print(f"Failed to parse request data as JSON: {str(e)}")
                 return Response({'error': 'Invalid JSON data'}, status=400)
 
-        # Log received data
-        print(f"Received {len(frames)} frames")
-        
+        # Print raw request data
+        try:
+            print("Request data content:", json.dumps(request.data))
+        except:
+            print("Request data (could not be JSON serialized):", request.data)
+
         if not frames:
             print("No frames provided in request")
             return Response({'error': 'No frames provided'}, status=400)
 
+        print(f"Received {len(frames)} frames")
+
         # Clean and validate URLs
-        valid_frames = []
         for frame in frames:
             if isinstance(frame, dict) and 'url' in frame:
                 original_url = frame['url']
                 cleaned_url = clean_url(original_url)
                 print(f"Original URL: {original_url}")
                 print(f"Cleaned URL: {cleaned_url}")
-                
-                # Add the cleaned URL to valid frames regardless of validation
-                # to avoid unnecessary HEAD requests that might cause rate limiting
+                if not is_url_valid(cleaned_url):
+                    print(f"Invalid or unreachable URL: {cleaned_url}")
+                    continue
                 frame['url'] = cleaned_url
-                valid_frames.append(frame)
 
-        if not valid_frames:
-            return Response({'error': 'No valid frames after cleaning'}, status=400)
-
-        # Initialize Confidence Predictor
+        # Initialize Hugging Face-based predictor
         predictor = ConfidencePredictor()
         if predictor.client is None:
             print("Failed to initialize predictor client.")
-            return Response({
-                'error': 'Failed to initialize confidence predictor', 
-                'details': 'Check HF_API_TOKEN environment variable and network connectivity'
-            }, status=500)
+            return Response({'error': 'Failed to initialize confidence predictor'}, status=500)
 
         confidence_scores = []
 
-        # Process each frame
-        for frame in valid_frames:
+        for frame in frames:
+            if not isinstance(frame, dict) or 'url' not in frame:
+                print(f"Invalid frame format: {frame}")
+                continue
+
             frame_url = frame.get('url')
             print(f"Processing frame URL: {frame_url}")
-            
             score = predictor.process_image_url(frame_url)
             if score is not None:
                 confidence_scores.append(score)
@@ -653,7 +614,6 @@ def analyze_confidence(request):
         if not confidence_scores:
             return Response({'error': 'No valid predictions'}, status=400)
 
-        # Calculate average score
         final_score = sum(confidence_scores) / len(confidence_scores)
         print(f"Average confidence score: {final_score:.2f}")
 
