@@ -31,7 +31,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-secret-key')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 PORT = os.environ.get('PORT', '8000')
 BASE_URL=os.environ.get('BASE_URL', 'http://127.0.0.1:8000/')
 ALLOWED_HOSTS = [
