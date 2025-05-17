@@ -339,55 +339,11 @@ def chatbot_response(request):
             
             # # print("Verification Results List:", verification_results_list)
             # print("Verification Summary:", verification_summary)
-            
-            # Move this calculation inside the function
-            if interview_state["total_questions"] > 0:
-                total_score = round(interview_state['total_score'], 1)
-                total_possible = interview_state["total_questions"] * 10
-                marks_string = f"{total_score}/{total_possible}"
-                # print("total_possible", total_possible)
-                # print("marks_string ", marks_string)
+            # Confidence Prediction Function
+            def run_confidence_prediction():
+                print("Running Confidence Prediction Model...")
                 
-                # Update database inside the function
-                if interview_state["current_job_id"] and interview_state["current_candidate_id"]:
-                    print("Updating ApplicationTable with marks and verification results...")
-                    try:
-                        application = ApplicationTable.objects.get(
-                            job_id=interview_state["current_job_id"],
-                            candidate_id=interview_state["current_candidate_id"]
-                        )
-                        application.marks = marks_string
-                        print("marks", application.marks)
-                        # Make sure verification_results is in the correct format for JSONField
-                        # If it's a dictionary, Django can handle it directly
-                        print("here for submitting verification results")
-                        # application.face_verification_result = verification_results_list
-
-                        # print("verification_results", application.face_verification_result)
-                        # # Check verification rate and set flag_status accordingly
-                        # verification_rate = verification_summary.get("verification_rate", 0)
-                        # if verification_rate > 80:
-                        #     application.flag_status = False  # Good verification rate
-                        # else:
-                        #     application.flag_status = True   # Poor verification rate
-
-                        application.save()
-                        # print(f"Successfully updated marks and verification results")
-                        # print(f"Successfully saved results. Verification rate: {verification_rate}%, Flag status: {application.flag_status}")
-
-                    except ApplicationTable.DoesNotExist:
-                        print("Application not found")
-                    except Exception as e:
-                        print(f"Error updating application: {e}")
-            
-            # Confidence Prediction Function - Run directly instead of nested threading
-            run_confidence_prediction()
-
-        def run_confidence_prediction():
-            print("Running Confidence Prediction Model...")
-            
-            try:
-                # Add timeout handling for network operations
+                # Pass the same frames used in face verification
                 confidence_results = confidence_prediction(
                     interview_state["current_candidate_id"],
                     interview_state["current_job_id"]
@@ -411,30 +367,53 @@ def chatbot_response(request):
                     print("Application not found for confidence prediction.")
                 except Exception as e:
                     print(f"Error updating confidence prediction: {e}")
-            except Exception as e:
-                print(f"Error during confidence prediction: {e}")
 
-    # Create a thread pool or thread limit to avoid resource issues
-        from concurrent.futures import ThreadPoolExecutor
-        import threading
-        import time
+            # Run confidence prediction in a separate thread
+            confidence_thread = threading.Thread(target=run_confidence_prediction)
+            confidence_thread.start()
+            # Move this calculation inside the function
+            if interview_state["total_questions"] > 0:
+                total_score = round(interview_state['total_score'], 1)
+                total_possible = interview_state["total_questions"] * 10
+                marks_string = f"{total_score}/{total_possible}"
+                # print("total_possible", total_possible)
+                # print("marks_string ", marks_string)
+                
+                # Update database inside the function
+                if interview_state["current_job_id"] and interview_state["current_candidate_id"]:
+                    print("Updating ApplicationTable with marks and verification results...")
+                    try:
+                        application = ApplicationTable.objects.get(
+                            job_id=interview_state["current_job_id"],
+                            candidate_id=interview_state["current_candidate_id"]
+                        )
+                        application.marks = marks_string
+                        print("marks",application.marks)
+                        # Make sure verification_results is in the correct format for JSONField
+                        # If it's a dictionary, Django can handle it directly
+                        print("here for submitting verification results")
+                        # application.face_verification_result = verification_results_list
 
-        # Thread safety lock for database operations
-        db_lock = threading.Lock()
+                        # print("verification_results", application.face_verification_result)
+                        # # Check verification rate and set flag_status accordingly
+                        # verification_rate = verification_summary.get("verification_rate", 0)
+                        # if verification_rate > 80:
+                        #     application.flag_status = False  # Good verification rate
+                        # else:
+                        #     application.flag_status = True   # Poor verification rate
 
-        # Use a thread pool executor with a maximum of workers
-        max_workers = 3  # Adjust based on your server capacity
-        executor = ThreadPoolExecutor(max_workers=max_workers)
+                        application.save()
+                        # print(f"Successfully updated marks and verification results")
+                        # print(f"Successfully saved results. Verification rate: {verification_rate}%, Flag status: {application.flag_status}")
 
-        # Start the verification in a background thread with better error handling
-        try:
-            # Submit the task to the thread pool instead of creating a new thread
-            future = executor.submit(run_face_verification)
-            
-            # Optional: You can set a timeout or handle completion
-            future.result(timeout=60)  # Wait up to 60 seconds for completion
-        except Exception as e:
-            print(f"Failed to start background process: {e}")
+                    except ApplicationTable.DoesNotExist:
+                        print("Application not found")
+                    except Exception as e:
+                        print(f"Error updating application: {e}")
+        
+        # Start the verification in a background thread
+        thread = threading.Thread(target=run_face_verification)
+        thread.start()
         
         response_data = {
             'response': "Thankyou for your time. The interview is now completed. Good luck with your application",
