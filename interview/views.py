@@ -254,6 +254,8 @@ def create_initial_system_message(interview_details):
                   "Strictly follow real life interview process."
                   "Remember, it is not a mock interview. It is a real interview. So, be strict to it."
     }
+from celery import shared_task
+from django.db import connection
 import threading
 @api_view(['POST'])
 @csrf_exempt
@@ -322,12 +324,13 @@ def chatbot_response(request):
         application.save()
         print("Candidate has quit the interview or max questions reached.")
         # Define the face verification function
-        def run_face_verification():
+        @shared_task
+        def run_face_verification_task(current_candidate_id, current_job_id,total_questions, total_score):
             print("Running Facing Verification Model...!!😊!!")
             # Get the full response from verify_interview_frames
             # full_verification_response = verify_interview_frames(
-            #     interview_state["current_candidate_id"],
-            #     interview_state["current_job_id"]
+            #     current_candidate_id,
+            #     current_job_id
             # )
             # print("Face Verification Full Response:", full_verification_response)
             
@@ -339,39 +342,9 @@ def chatbot_response(request):
             
             # # print("Verification Results List:", verification_results_list)
             # print("Verification Summary:", verification_summary)
-            # Confidence Prediction Function
-            def run_confidence_prediction():
-                print("Running Confidence Prediction Model...")
-                
-                # Pass the same frames used in face verification
-                confidence_results = confidence_prediction(
-                    interview_state["current_candidate_id"],
-                    interview_state["current_job_id"]
-                )
-                print("Confidence Prediction Results:", confidence_results)
-                confidence_results_score = confidence_results.get("final_score")
-                print("Confidence Prediction Score from 100% : ", confidence_results_score)
-
-                try:
-                    application = ApplicationTable.objects.get(
-                        job_id=interview_state["current_job_id"],
-                        candidate_id=interview_state["current_candidate_id"]
-                    )
-
-                    # Store confidence prediction results in DB
-                    application.confidence_score = confidence_results_score
-                    application.save()
-                    print("Successfully saved confidence prediction results.")
-
-                except ApplicationTable.DoesNotExist:
-                    print("Application not found for confidence prediction.")
-                except Exception as e:
-                    print(f"Error updating confidence prediction: {e}")
-
-            # Run confidence prediction in a separate thread
-            confidence_thread = threading.Thread(target=run_confidence_prediction)
-            confidence_thread.start()
-            # Move this calculation inside the function
+            
+            # Trigger the confidence prediction task
+            run_confidence_prediction_task.delay(current_candidate_id, current_job_id)
             if interview_state["total_questions"] > 0:
                 total_score = round(interview_state['total_score'], 1)
                 total_possible = interview_state["total_questions"] * 10
@@ -411,9 +384,50 @@ def chatbot_response(request):
                     except Exception as e:
                         print(f"Error updating application: {e}")
         
+            # Confidence Prediction Function as a Celery task
+        @shared_task
+        def run_confidence_prediction_task(current_candidate_id, current_job_id):
+            print("Running Confidence Prediction Model...")
+            
+            # Pass the same frames used in face verification
+            confidence_results = confidence_prediction(
+                interview_state["current_candidate_id"],
+                interview_state["current_job_id"]
+            )
+            print("Confidence Prediction Results:", confidence_results)
+            confidence_results_score = confidence_results.get("final_score")
+            print("Confidence Prediction Score from 100% : ", confidence_results_score)
+
+            try:
+                application = ApplicationTable.objects.get(
+                    job_id=interview_state["current_job_id"],
+                    candidate_id=interview_state["current_candidate_id"]
+                )
+
+                # Store confidence prediction results in DB
+                application.confidence_score = confidence_results_score
+                application.save()
+                print("Successfully saved confidence prediction results.")
+
+            except ApplicationTable.DoesNotExist:
+                print("Application not found for confidence prediction.")
+            except Exception as e:
+                print(f"Error updating confidence prediction: {e}")
+
+            # Run confidence prediction in a separate thread
+            # confidence_thread = threading.Thread(target=run_confidence_prediction)
+            # confidence_thread.start()
+            # Move this calculation inside the function
+           
         # Start the verification in a background thread
-        thread = threading.Thread(target=run_face_verification)
-        thread.start()
+        # === Replace your threading call with this ===
+        # Instead of starting a thread, queue a Celery task
+        run_face_verification_task.delay(
+            interview_state["current_candidate_id"],
+            interview_state["current_job_id"],
+            interview_state["total_questions"],
+            interview_state['total_score']
+        )
         
         response_data = {
             'response': "Thankyou for your time. The interview is now completed. Good luck with your application",
