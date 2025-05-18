@@ -368,6 +368,70 @@ class JobPostingWithApplicantsView(APIView):
                 {"detail": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+class RecruiterJobCompeletedInterviews(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            user = request.user
+            # Try to get or create recruiter profile
+            recruiter, created = RecruiterTable.objects.get_or_create(
+                recruiter=user,
+                defaults={'recruiter_name': user.username}  # Adjust fields as needed
+            )
+            
+            job_posts = JobPostingTable.objects.filter(recruiter=recruiter)
+
+            result = []
+            for job in job_posts:
+                applicants = ApplicationTable.objects.filter(job=job, interview_status='completed')
+                result.append({
+                "applicants": applicants.count()
+
+                    
+                })
+            print("result of comppleted interviews ",result)
+            return Response(result)
+        except Exception as e:
+            print(f"Error in getting total interviews: {str(e)}")
+            return Response(
+                {"detail": str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class ReinterviewRecruiterRequests(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            user = request.user
+            # Try to get or create recruiter profile
+            recruiter, created = RecruiterTable.objects.get_or_create(
+                recruiter=user,
+                defaults={'recruiter_name': user.username}  # Adjust fields as needed
+            )
+            
+            job_posts = JobPostingTable.objects.filter(recruiter=recruiter)
+
+            result = []
+            for job in job_posts:
+                applicants = ApplicationTable.objects.filter(job=job, request_re_interview=True)
+                result.append({
+                "applicants": applicants.count()
+
+                    
+                })
+            print("result of comppleted interviews ",result)
+            return Response(result)
+        except Exception as e:
+            print(f"Error in getting total interviews: {str(e)}")
+            return Response(
+                {"detail": str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
 from django.views.generic.list import ListView
 from django.http import JsonResponse
 from .models import ApplicationTable, JobPostingTable
@@ -685,6 +749,45 @@ class CandidateAppliedJobsView(generics.ListAPIView):
             
         return Response(data)
 
+
+class CandidatePendingInterview(CandidateAppliedJobsView):
+    permission_classes=[IsAuthenticated]
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        return queryset
+    def list(self, request, *args, **kwargs):
+        queryset= self.get_queryset()
+        data=[]
+        for job in queryset:
+            interviews=ApplicationTable.objects.filter(
+                candidate__candidate=request.user,
+                job=job,
+                interview_status='not_started'
+
+            ).first()
+
+            if not interviews:
+                continue
+            interview_data={
+                'id':job.id,
+                'title': job.title,
+                # 'description' : job.description,
+                # 'skills' : job.description,
+                # 'experience_level' : job.experience_level,
+                # 'location' : job.location,
+                # 'status': job.status,
+                # 'created_at': job.created_at,
+                # 'application_date' : interviews.applied_at if interviews else None,
+                # 'marks': interviews.marks if interviews else None,
+                # 'interview_status' : interviews.interview_status,
+                # 'application_status': interviews.application_status
+
+            }
+
+            data.append(interview_data)
+            print('data',data)
+        return Response(data)
+    
 class CandidateInterviewDone(CandidateAppliedJobsView):
     permission_classes=[IsAuthenticated]
     def get_queryset(self):
@@ -707,7 +810,7 @@ class CandidateInterviewDone(CandidateAppliedJobsView):
                 'id':job.id,
                 'title': job.title,
                 'description' : job.description,
-                'skills' : job.description,
+                'skills' : job.skills,
                 'experience_level' : job.experience_level,
                 'location' : job.location,
                 'status': job.status,
@@ -788,7 +891,6 @@ class RequestReInterview(APIView):
             return Response({"error": "Application not found."}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        
 
 from rest_framework.exceptions import NotFound
 
