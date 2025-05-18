@@ -328,20 +328,20 @@ def chatbot_response(request):
         def run_face_verification():
             print("Running Facing Verification Model...!!😊!!")
             # Get the full response from verify_interview_frames
-            # full_verification_response = verify_interview_frames(
-            #     interview_state["current_candidate_id"],
-            #     interview_state["current_job_id"]
-            # )
-            # print("Face Verification Full Response:", full_verification_response)
+            full_verification_response = verify_interview_frames(
+                interview_state["current_candidate_id"],
+                interview_state["current_job_id"]
+            )
+            print("Face Verification Full Response:", full_verification_response)
             
-            # # Extract the verification_results list
-            # verification_results_list = full_verification_response.get("verification_results", [])
+            # Extract the verification_results list
+            verification_results_list = full_verification_response.get("verification_results", [])
             
-            # # Extract the summary dictionary
-            # verification_summary = full_verification_response.get("summary", {})
+            # Extract the summary dictionary
+            verification_summary = full_verification_response.get("summary", {})
             
-            # # print("Verification Results List:", verification_results_list)
-            # print("Verification Summary:", verification_summary)
+            # print("Verification Results List:", verification_results_list)
+            print("Verification Summary:", verification_summary)
             # Confidence Prediction Function
             def run_confidence_prediction():
                 print("Running Confidence Prediction Model...")
@@ -395,15 +395,15 @@ def chatbot_response(request):
                         # Make sure verification_results is in the correct format for JSONField
                         # If it's a dictionary, Django can handle it directly
                         print("here for submitting verification results")
-                        # application.face_verification_result = verification_results_list
+                        application.face_verification_result = verification_results_list
 
-                        # print("verification_results", application.face_verification_result)
-                        # # Check verification rate and set flag_status accordingly
-                        # verification_rate = verification_summary.get("verification_rate", 0)
-                        # if verification_rate > 80:
-                        #     application.flag_status = False  # Good verification rate
-                        # else:
-                        #     application.flag_status = True   # Poor verification rate
+                        print("verification_results", application.face_verification_result)
+                        # Check verification rate and set flag_status accordingly
+                        verification_rate = verification_summary.get("verification_rate", 0)
+                        if verification_rate > 80:
+                            application.flag_status = False  # Good verification rate
+                        else:
+                            application.flag_status = True   # Poor verification rate
 
                         application.save()
                         # print(f"Successfully updated marks and verification results")
