@@ -311,119 +311,27 @@ def chatbot_response(request):
     # Perform intent classification
     intent = get_intent(user_input)
     print(f"Detected Intent: {intent}")
+    from interview.tasks import process_post_interview
 
     # Check if the intent is to quit the interview or max questions reached
     if intent == "Quit_interview" or interview_state["question_count"] >= 9:
-        print("Yaaar ye function q chal rha hai pta ni")
-        # interview_state["is_completed"] = True
-        application = ApplicationTable.objects.get(
-                            job_id=interview_state["current_job_id"],
-                            candidate_id=interview_state["current_candidate_id"]
-                        )
-        application.interview_status = 'completed'
-        print("interview status is updated to completed")
-        application.save()
-        print("Candidate has quit the interview or max questions reached.")
-        # Define the face verification function
-        def run_face_verification():
-            print("Running Facing Verification Model...!!😊!!")
-            # Get the full response from verify_interview_frames
-            full_verification_response = verify_interview_frames(
-                interview_state["current_candidate_id"],
-                interview_state["current_job_id"]
-            )
-            print("Face Verification Full Response:", full_verification_response)
-            
-            # Extract the verification_results list
-            verification_results_list = full_verification_response.get("verification_results", [])
-            
-            # Extract the summary dictionary
-            verification_summary = full_verification_response.get("summary", {})
-            
-            # print("Verification Results List:", verification_results_list)
-            print("Verification Summary:", verification_summary)
-            # Confidence Prediction Function
-            def run_confidence_prediction():
-                print("Running Confidence Prediction Model...")
-                
-                # Pass the same frames used in face verification
-                confidence_results = confidence_prediction(
-                    interview_state["current_candidate_id"],
-                    interview_state["current_job_id"]
-                )
-                print("Confidence Prediction Results:", confidence_results)
-                confidence_results_score = confidence_results.get("final_score")
-                print("Confidence Prediction Score from 100% : ", confidence_results_score)
+            print("Interview ending, triggering background tasks...")
 
-                try:
-                    application = ApplicationTable.objects.get(
-                        job_id=interview_state["current_job_id"],
-                        candidate_id=interview_state["current_candidate_id"]
-                    )
+            candidate_id = interview_state["current_candidate_id"]
+            job_id = interview_state["current_job_id"]
+            total_score = interview_state["total_score"]
+            total_questions = interview_state["total_questions"]
 
-                    # Store confidence prediction results in DB
-                    application.confidence_score = confidence_results_score
-                    application.save()
-                    print("Successfully saved confidence prediction results.")
+            process_post_interview.delay(candidate_id, job_id, total_score, total_questions)
 
-                except ApplicationTable.DoesNotExist:
-                    print("Application not found for confidence prediction.")
-                except Exception as e:
-                    print(f"Error updating confidence prediction: {e}")
-
-            # Run confidence prediction in a separate thread
-            confidence_thread = threading.Thread(target=run_confidence_prediction)
-            confidence_thread.start()
-            # Move this calculation inside the function
-            if interview_state["total_questions"] > 0:
-                total_score = round(interview_state['total_score'], 1)
-                total_possible = interview_state["total_questions"] * 10
-                marks_string = f"{total_score}/{total_possible}"
-                # print("total_possible", total_possible)
-                # print("marks_string ", marks_string)
-                
-                # Update database inside the function
-                if interview_state["current_job_id"] and interview_state["current_candidate_id"]:
-                    print("Updating ApplicationTable with marks and verification results...")
-                    try:
-                        application = ApplicationTable.objects.get(
-                            job_id=interview_state["current_job_id"],
-                            candidate_id=interview_state["current_candidate_id"]
-                        )
-                        application.marks = marks_string
-                        print("marks",application.marks)
-                        # Make sure verification_results is in the correct format for JSONField
-                        # If it's a dictionary, Django can handle it directly
-                        print("here for submitting verification results")
-                        application.face_verification_result = verification_results_list
-
-                        print("verification_results", application.face_verification_result)
-                        # Check verification rate and set flag_status accordingly
-                        verification_rate = verification_summary.get("verification_rate", 0)
-                        if verification_rate > 80:
-                            application.flag_status = False  # Good verification rate
-                        else:
-                            application.flag_status = True   # Poor verification rate
-
-                        application.save()
-                        # print(f"Successfully updated marks and verification results")
-                        # print(f"Successfully saved results. Verification rate: {verification_rate}%, Flag status: {application.flag_status}")
-
-                    except ApplicationTable.DoesNotExist:
-                        print("Application not found")
-                    except Exception as e:
-                        print(f"Error updating application: {e}")
+            response_data = {
+                'response': "Thankyou for your time. The interview is now completed. Good luck with your application",
+                'question_count': interview_state["question_count"],
+                'intent': intent
+            }
+            return Response(response_data)
         
-        # Start the verification in a background thread
-        thread = threading.Thread(target=run_face_verification)
-        thread.start()
         
-        response_data = {
-            'response': "Thankyou for your time. The interview is now completed. Good luck with your application",
-            'question_count': interview_state["question_count"],
-            'intent': intent
-        }
-        return Response(response_data)
 
     # Append the user's message to the conversation history
     interview_state["messages"].append({"role": "user", "content": user_input})
