@@ -29,10 +29,10 @@ def process_post_interview(candidate_id, job_id, total_score, total_questions):
         if total_questions > 0:
             marks_string = f"{round(total_score, 1)}/{total_questions * 10}"
             application.marks = marks_string
-        application.face_verification_result = verification_results_list
+        # application.face_verification_result = verification_results_list
 
-        verification_rate = verification_summary.get("verification_rate", 0)
-        application.flag_status = verification_rate <= 80
+        # verification_rate = verification_summary.get("verification_rate", 0)
+        # application.flag_status = verification_rate <= 80
         application.save()
         print("Saved all post-interview results.")
 
