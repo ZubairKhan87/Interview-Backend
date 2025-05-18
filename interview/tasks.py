@@ -17,9 +17,9 @@ def process_post_interview(candidate_id, job_id, total_score, total_questions):
         print(f"Error fetching/updating application: {e}")
         return
 
-    full_verification_response = verify_interview_frames(candidate_id, job_id)
-    verification_results_list = full_verification_response.get("verification_results", [])
-    verification_summary = full_verification_response.get("summary", {})
+    # full_verification_response = verify_interview_frames(candidate_id, job_id)
+    # verification_results_list = full_verification_response.get("verification_results", [])
+    # verification_summary = full_verification_response.get("summary", {})
 
     confidence_results = confidence_prediction(candidate_id, job_id)
     confidence_results_score = confidence_results.get("final_score")
