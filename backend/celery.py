@@ -1,10 +1,9 @@
-# project_root/celery.py
-
 import os
 from celery import Celery
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings')
+# Set default Django settings module for 'celery'
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "backend.settings")  # Change if your Django project folder is named differently
 
-app = Celery('your_project')
-app.config_from_object('django.conf:settings', namespace='CELERY')
+app = Celery("backend")  # Match with your Django project folder
+app.config_from_object("django.conf:settings", namespace="CELERY")
 app.autodiscover_tasks()

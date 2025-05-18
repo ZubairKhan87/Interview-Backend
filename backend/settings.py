@@ -411,5 +411,7 @@ CELERY_BROKER_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 
 # Use Railway's Redis URL when deployed (will update in step 7)
 
+
+CELERY_BROKER_URL = os.environ.get("REDIS_URL")  # set this in Railway
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
