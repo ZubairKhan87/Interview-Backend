@@ -403,3 +403,6 @@ ADMIN_EMAILS = [
     'faizan2021@namal.edu.pk',
     'zubair2021@namal.edu.pk'
 ]
+CELERY_BROKER_URL = os.environ.get("REDIS_URL")  # set this in Railway
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
