@@ -1,4 +1,4 @@
-ÿþï»¿# Python 3.8 compatibility for all packages
+ï»¿# Python 3.8 compatibility for all packages
 # ------------------------------------
 
 # Django and REST framework
