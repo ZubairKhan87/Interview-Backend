@@ -1,7 +1,7 @@
 # interview/tasks.py
 
 from celery import shared_task
-from .models import ApplicationTable
+from job_posting.models import ApplicationTable
 from interview.views import verify_interview_frames, confidence_prediction  # Import your functions
 
 @shared_task
